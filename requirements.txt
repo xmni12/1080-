@@ -1,0 +1,6 @@
+PySide6
+DrissionPage
+Flask
+flask-cors
+pyperclip
+requests
