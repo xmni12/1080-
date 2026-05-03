@@ -1,9 +1,10 @@
 import asyncio
 import logging
-from typing import Dict, Any
 from backend.database import AsyncSessionLocal
 from backend.services.spider_service import DiscuzSpiderService
 from backend.routers.websocket import manager
+from DrissionPage import ChromiumPage, ChromiumOptions
+from core.utils import load_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,44 +16,71 @@ class TaskManager:
         """
         log_msg = f"Starting spider task for section: {section}"
         logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg})
+        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "info"})
         
-        # 模拟爬取耗时
         await asyncio.sleep(5)
         
         log_msg = f"Finished spider task for section: {section}"
         logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg})
+        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
-    async def run_discuz_spider(self, section_key: str, config: Dict[str, Any]):
+    async def run_discuz_spider(self, section_key: str):
         """
-        运行 Discuz 爬虫任务
+        运行真实的 Discuz 爬虫任务
         """
-        log_msg = f"Initializing Discuz spider for section: {section_key}"
-        logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg})
-        
-        # 模拟浏览器页面实例 (Mock ChromiumPage)
-        class MockPage:
-            def __init__(self):
-                self.scroll = type('MockScroll', (), {'down': lambda x: None})()
-                self.set = type('MockSet', (), {'download_path': lambda x: None})()
-                self.url = ""
-                self.html = ""
-            def get(self, url): self.url = url
-            def eles(self, selector): return []
-            def __repr__(self): return "<MockPage>"
+        def ws_log(msg: str):
+            logger.info(msg)
+            try:
+                # 异步触发 WebSocket 推送，不阻塞同步的爬虫逻辑
+                loop = asyncio.get_running_loop()
+                level = "info"
+                if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                elif "避让" in msg or "跳过" in msg: level = "warn"
+                
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except Exception as e:
+                logger.error(f"WebSocket broadcast error: {e}")
 
-        mock_page = MockPage()
+        ws_log(f"▶ 开始初始化 [{section_key}] 版块爬虫任务...")
         
-        async with AsyncSessionLocal() as session:
-            spider = DiscuzSpiderService(page=mock_page)
-            # 调用重构后的异步爬虫逻辑
-            await spider.run_task(session, config, section_key)
+        config = load_config()
+        section_config = config.get("sections", {}).get(section_key, {})
+        if not section_config: section_config = config.get(section_key, {}) # 兼容旧版配置结构
+        hide_browser = config.get("hide_browser", False)
+        
+        if not section_config.get("url"):
+            default_urls = {
+                '4k': 'https://www.hhd800.com/forum-65-1.html',
+                'vr': 'https://www.hhd800.com/forum-80-1.html',
+                'hd': 'https://www.hhd800.com/forum-58-1.html',
+                'sub': 'https://www.hhd800.com/forum-60-1.html'
+            }
+            section_config['url'] = default_urls.get(section_key, '')
+
+        co = ChromiumOptions().set_local_port(9222)
+        if hide_browser: 
+            ws_log("已开启无头静默模式运行。")
+            co.headless()
             
-        log_msg = f"Discuz spider task for {section_key} completed."
-        logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg})
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            ws_log("✅ DrissionPage 浏览器内核启动成功。")
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动失败: {e}")
+            return
+            
+        try:
+            async with AsyncSessionLocal() as session:
+                spider = DiscuzSpiderService(page=page, log_callback=ws_log)
+                await spider.run_task(session, section_config, section_key)
+        except Exception as e:
+            ws_log(f"❌ 爬虫执行出现致命异常: {str(e)}")
+        finally:
+            try:
+                page.quit()
+            except:
+                pass
+            ws_log(f"⏹ [{section_key}] 爬虫任务已安全结束，浏览器资源已释放。")
 
-# 实例化全局任务管理器
 task_manager = TaskManager()
