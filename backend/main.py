@@ -1,9 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import records, tasks, websocket, settings
 from backend.database import engine, Base
-from backend import models  # 导入模型以注册到 Base.metadata
+from backend import models
 
 app = FastAPI(title="DiscuzSpider API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
