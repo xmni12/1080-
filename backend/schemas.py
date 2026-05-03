@@ -14,6 +14,10 @@ class RecordResponse(RecordBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class ManualEntryRequest(BaseModel):
+    codes: str
+    section: str
+
 class TaskRequest(BaseModel):
     section: str
 
@@ -39,3 +43,4 @@ class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
     rename_settings: RenameSettings
+    spider_threads: int = 1

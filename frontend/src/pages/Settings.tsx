@@ -126,17 +126,31 @@ export function Settings() {
             <span className="w-1.5 h-4 bg-slate-800 rounded-full"></span>
             高级参数
           </h4>
-          <div className="space-y-2 flex items-center gap-3 pt-2">
-              <input 
-                type="checkbox" 
-                id="hide_browser"
-                checked={config.hide_browser ?? false}
-                onChange={e => setConfig({ ...config, hide_browser: e.target.checked })}
-                className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
-              />
-              <label htmlFor="hide_browser" className="text-sm font-medium text-slate-700 cursor-pointer">
-                开启无头静默运行 (极深隐身模式)
-              </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="space-y-2 flex items-center gap-3">
+                <input 
+                  type="checkbox" 
+                  id="hide_browser"
+                  checked={config.hide_browser ?? false}
+                  onChange={e => setConfig({ ...config, hide_browser: e.target.checked })}
+                  className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                />
+                <label htmlFor="hide_browser" className="text-sm font-medium text-slate-700 cursor-pointer">
+                  开启无头静默运行 (极深隐身模式)
+                </label>
+            </div>
+            <div className="space-y-2 flex items-center gap-3">
+                <label htmlFor="spider_threads" className="text-sm font-medium text-slate-700">爬虫多线程数量</label>
+                <input 
+                  type="number" 
+                  id="spider_threads"
+                  value={config.spider_threads ?? 1}
+                  onChange={e => setConfig({ ...config, spider_threads: Number(e.target.value) })}
+                  className="w-20 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary text-center"
+                  min="1" max="10"
+                />
+                <span className="text-xs text-slate-500">(提升并发抓取效率)</span>
+            </div>
           </div>
       </div>
     </div>
