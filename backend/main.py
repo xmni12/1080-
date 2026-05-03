@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.routers import records, tasks
+from backend.routers import records, tasks, websocket, settings
 from backend.database import engine, Base
 from backend import models  # 导入模型以注册到 Base.metadata
 
@@ -12,6 +12,8 @@ async def startup():
 
 app.include_router(records.router)
 app.include_router(tasks.router)
+app.include_router(websocket.router)
+app.include_router(settings.router)
 
 @app.get("/")
 async def read_root():
