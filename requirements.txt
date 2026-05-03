@@ -4,3 +4,11 @@ Flask
 flask-cors
 pyperclip
 requests
+fastapi
+uvicorn
+sqlalchemy
+aiosqlite
+pydantic
+pytest
+httpx
+pytest-asyncio
