@@ -18,6 +18,9 @@ class ManualEntryRequest(BaseModel):
     codes: str
     section: str
 
+class DeleteRequest(BaseModel):
+    ids: list[int]
+
 class TaskRequest(BaseModel):
     section: str
 
