@@ -75,10 +75,10 @@ class TaskManager:
         
         if not section_config.get("url"):
             default_urls = {
-                '4k': 'https://www.hhd800.com/forum-65-1.html',
-                'vr': 'https://www.hhd800.com/forum-80-1.html',
-                'hd': 'https://www.hhd800.com/forum-58-1.html',
-                'sub': 'https://www.hhd800.com/forum-60-1.html'
+                '4k': 'https://x999x.me/forum-65-1.html',
+                'vr': 'https://x999x.me/forum-80-1.html',
+                'hd': 'https://x999x.me/forum-58-1.html',
+                'sub': 'https://x999x.me/forum-60-1.html'
             }
             section_config['url'] = default_urls.get(section_key, '')
 
