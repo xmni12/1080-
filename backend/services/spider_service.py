@@ -97,6 +97,15 @@ class DiscuzSpiderService:
                 await self._human_delay(config, 3.0, 6.0)
                 await self._human_scroll(config)
                 
+                # --- CF 盾拦截检测 ---
+                page_title = self.page.title or ""
+                page_html = self.page.html or ""
+                if "Just a moment" in page_title or "Cloudflare" in page_title or "cf-turnstile" in page_html or "challenge-form" in page_html:
+                    self._log("🚨 遭遇 CF 盾拦截！无法获取论坛帖子。")
+                    self._log("💡 建议：请在【系统设置】中【关闭】“无头静默运行”，然后重新启动任务。在弹出的浏览器中手动勾选一次验证码，系统会自动保存绿卡，之后便可畅通无阻！")
+                    self.stop_requested = True
+                    break
+                
                 tasks = []
                 seen_tids = set()
                 for a in self.page.eles('tag:a'):
