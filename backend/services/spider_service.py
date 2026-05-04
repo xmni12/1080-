@@ -75,8 +75,9 @@ class DiscuzSpiderService:
         try:
             self.stop_requested = False
             downloaded_count = 0
-            limit = config.get('daily_limit', 55)
-            start_page = config.get('start_page', 1)
+            limit = config.get('daily_limit')
+            if limit is None: limit = 55
+            start_page = int(config.get('start_page', 1))
             save_path = config.get('save_path', './downloads')
             section_url = config.get('url')
             
