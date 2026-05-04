@@ -1,4 +1,4 @@
-import { Play, SquareSquare, StopCircle } from 'lucide-react';
+import { Play, SquareSquare, StopCircle, ShieldCheck } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
 import { LogConsole } from '../components/LogConsole';
 import axios from 'axios';
@@ -22,6 +22,14 @@ export function Tasks() {
     }
   };
 
+  const getCfClearance = async () => {
+    try {
+      await axios.post('http://127.0.0.1:8000/api/tasks/cf_clearance');
+    } catch (error) {
+      console.error('Failed to trigger CF clearance:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -30,15 +38,23 @@ export function Tasks() {
             <SquareSquare className="w-5 h-5 text-primary" />
             任务调度中心
           </h3>
-          <button 
-            onClick={stopSpider}
-            className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
-          >
-            <StopCircle className="w-4 h-4" /> 强制终止当前任务
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={getCfClearance}
+              className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            >
+              <ShieldCheck className="w-4 h-4" /> 获取长效 CF 绿卡
+            </button>
+            <button 
+              onClick={stopSpider}
+              className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            >
+              <StopCircle className="w-4 h-4" /> 强制终止当前任务
+            </button>
+          </div>
         </div>
         <p className="text-slate-500 mb-6 text-sm">
-          在此处手动触发后台爬虫任务。任务将在服务器后台异步运行，不阻塞当前页面。
+          在此处手动触发后台爬虫任务。如果被拦截，请先点击获取绿卡以穿透防封控系统。
         </p>
 
         <div className="flex flex-wrap gap-4">

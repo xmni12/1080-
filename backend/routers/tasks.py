@@ -22,6 +22,14 @@ async def stop_spider(request: TaskRequest = None):
     result = task_manager.stop_spider(section)
     return result
 
+@router.post("/cf_clearance")
+async def trigger_cf_clearance(background_tasks: BackgroundTasks):
+    """
+    触发独立的获取 CF 绿卡任务
+    """
+    background_tasks.add_task(task_manager.get_cf_clearance)
+    return {"status": "started"}
+
 @router.post("/rename")
 async def trigger_rename(request: RenameRequest, background_tasks: BackgroundTasks):
     """

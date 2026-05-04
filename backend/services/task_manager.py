@@ -117,4 +117,64 @@ class TaskManager:
                 pass
             ws_log(f"⏹ [{section_key}] 爬虫任务已安全结束，浏览器资源已释放。")
 
+    async def get_cf_clearance(self):
+        """
+        独立打开浏览器获取 CF 绿卡
+        """
+        def ws_log(msg: str):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = "info"
+                if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'cf_clearance' in self.active_pages:
+            ws_log("❌ 获取绿卡任务已经在运行中。")
+            return
+
+        ws_log("▶ 开始初始化独立的绿卡获取任务 (有头模式)...")
+        co = ChromiumOptions().set_local_port(9222)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            self.active_pages['cf_clearance'] = page
+            ws_log("✅ 浏览器已打开，请在弹出的窗口中等待或手动点击 CF 验证码！")
+            ws_log("⏳ 系统将自动监听过盾状态（最长等待 60 秒）...")
+            
+            page.get("https://x999x.me/")
+            
+            # 简单监听 60 秒，看看是否成功进入论坛首页
+            passed = False
+            for _ in range(60):
+                await asyncio.sleep(1)
+                if not getattr(self, 'active_pages', {}).get('cf_clearance'):
+                    # 任务可能被提前中止
+                    break
+                title = page.title or ""
+                if "Just a moment" not in title and "Cloudflare" not in title:
+                    passed = True
+                    break
+                    
+            if passed:
+                ws_log("✅ 恭喜！成功检测到论坛首页，CF 绿卡已安全保存。")
+                ws_log("💡 你现在可以关闭此窗口，去【系统设置】开启无头模式愉快地爬取了！")
+            else:
+                ws_log("⚠️ 60 秒内未检测到过盾成功，可能是网络慢或验证失败，请重试。")
+                
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动或访问异常: {e}")
+        finally:
+            if 'cf_clearance' in self.active_pages:
+                del self.active_pages['cf_clearance']
+            try:
+                page.quit()
+                ws_log("⏹ 绿卡获取任务结束，浏览器已关闭。")
+            except:
+                pass
+
 task_manager = TaskManager()
