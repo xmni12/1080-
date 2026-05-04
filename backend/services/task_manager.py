@@ -75,10 +75,10 @@ class TaskManager:
         
         if not section_config.get("url"):
             default_urls = {
-                '4k': 'https://x999x.me/forum-65-1.html',
-                'vr': 'https://x999x.me/forum-80-1.html',
-                'hd': 'https://x999x.me/forum-58-1.html',
-                'sub': 'https://x999x.me/forum-60-1.html'
+                '4k': 'https://x999x.me/forum.php?mod=forumdisplay&fid=202',
+                'vr': 'https://x999x.me/forum.php?mod=forumdisplay&fid=163',
+                'hd': 'https://x999x.me/forum.php?mod=forumdisplay&fid=75',
+                'sub': 'https://x999x.me/forum.php?mod=forumdisplay&fid=185'
             }
             section_config['url'] = default_urls.get(section_key, '')
 
