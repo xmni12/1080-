@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from backend.schemas import GlobalSettings, SectionSettings, RenameSettings
 from core.utils import load_config, save_config
+from backend.services.scheduler_service import scheduler_service
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -14,17 +15,22 @@ async def get_settings():
     sections = {}
     rename_settings = RenameSettings()
     hide_browser = config.get("hide_browser", False)
+    spider_threads = config.get("spider_threads", 1)
     
     for key, value in config.items():
-        if isinstance(value, dict) and key != "rename_settings":
+        if isinstance(value, dict) and key != "rename_settings" and key != "sections":
             sections[key] = SectionSettings(**value)
+        elif key == "sections":
+            for sub_k, sub_v in value.items():
+                sections[sub_k] = SectionSettings(**sub_v)
         elif key == "rename_settings":
             rename_settings = RenameSettings(**value)
             
     return GlobalSettings(
         sections=sections,
         hide_browser=hide_browser,
-        rename_settings=rename_settings
+        rename_settings=rename_settings,
+        spider_threads=spider_threads
     )
 
 @router.post("")
@@ -32,14 +38,18 @@ async def update_settings(settings: GlobalSettings):
     """
     更新全局配置
     """
-    config_data = {}
+    config_data = {"sections": {}}
     
-    # 将 sections 重新展开到顶级
     for section_name, section_data in settings.sections.items():
-        config_data[section_name] = section_data.model_dump()
+        config_data["sections"][section_name] = section_data.model_dump()
         
     config_data["hide_browser"] = settings.hide_browser
     config_data["rename_settings"] = settings.rename_settings.model_dump()
+    config_data["spider_threads"] = settings.spider_threads
     
     save_config(config_data)
+    
+    # 重载定时任务
+    scheduler_service.setup_jobs()
+    
     return {"status": "success", "message": "Settings updated"}

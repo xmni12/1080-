@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from backend.database import AsyncSessionLocal
 from backend.services.spider_service import DiscuzSpiderService
 from backend.routers.websocket import manager
@@ -10,6 +11,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TaskManager:
+    def __init__(self):
+        self.active_spiders: dict[str, DiscuzSpiderService] = {}
+        self.active_pages: dict[str, ChromiumPage] = {}
+
+    def stop_spider(self, section_key: str = None):
+        """
+        强制停止指定或所有版块的爬虫
+        """
+        if section_key and section_key in self.active_spiders:
+            self.active_spiders[section_key].stop_requested = True
+            logger.info(f"Requested stop for spider: {section_key}")
+            return {"status": "stopping", "section": section_key}
+        elif not section_key:
+            for key, spider in self.active_spiders.items():
+                spider.stop_requested = True
+                logger.info(f"Requested stop for spider: {key}")
+            return {"status": "stopping_all"}
+        return {"status": "not_running"}
+
     async def run_spider_mock(self, section: str):
         """
         模拟爬虫任务执行
@@ -28,6 +48,10 @@ class TaskManager:
         """
         运行真实的 Discuz 爬虫任务
         """
+        if section_key in self.active_spiders:
+            await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
+            return
+
         def ws_log(msg: str):
             logger.info(msg)
             try:
@@ -59,13 +83,18 @@ class TaskManager:
             section_config['url'] = default_urls.get(section_key, '')
 
         co = ChromiumOptions().set_local_port(9222)
+        # 持久化用户数据，完美对抗 CF 盾
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
         if hide_browser: 
             ws_log("已开启无头静默模式运行。")
             co.headless()
             
         try:
             page = ChromiumPage(addr_or_opts=co)
-            ws_log("✅ DrissionPage 浏览器内核启动成功。")
+            self.active_pages[section_key] = page
+            ws_log("✅ DrissionPage 浏览器内核启动成功 (已加载绿卡持久化环境)。")
         except Exception as e:
             ws_log(f"❌ 浏览器启动失败: {e}")
             return
@@ -73,10 +102,15 @@ class TaskManager:
         try:
             async with AsyncSessionLocal() as session:
                 spider = DiscuzSpiderService(page=page, log_callback=ws_log)
+                self.active_spiders[section_key] = spider
                 await spider.run_task(session, section_config, section_key)
         except Exception as e:
             ws_log(f"❌ 爬虫执行出现致命异常: {str(e)}")
         finally:
+            if section_key in self.active_spiders:
+                del self.active_spiders[section_key]
+            if section_key in self.active_pages:
+                del self.active_pages[section_key]
             try:
                 page.quit()
             except:

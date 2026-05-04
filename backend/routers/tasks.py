@@ -13,6 +13,15 @@ async def trigger_spider(request: TaskRequest, background_tasks: BackgroundTasks
     background_tasks.add_task(task_manager.run_discuz_spider, request.section)
     return {"status": "started", "section": request.section}
 
+@router.post("/stop")
+async def stop_spider(request: TaskRequest = None):
+    """
+    停止爬虫任务
+    """
+    section = request.section if request else None
+    result = task_manager.stop_spider(section)
+    return result
+
 @router.post("/rename")
 async def trigger_rename(request: RenameRequest, background_tasks: BackgroundTasks):
     """

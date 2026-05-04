@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import records, tasks, websocket, settings
 from backend.database import engine, Base
+from backend.services.scheduler_service import scheduler_service
 from backend import models
 
 app = FastAPI(title="DiscuzSpider API")
@@ -18,6 +19,7 @@ app.add_middleware(
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    scheduler_service.start()
 
 app.include_router(records.router)
 app.include_router(tasks.router)
