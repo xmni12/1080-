@@ -135,7 +135,7 @@ class TaskManager:
             ws_log("❌ 获取绿卡任务已经在运行中。")
             return
 
-        ws_log("▶ 开始初始化独立的绿卡获取任务 (有头模式)...")
+        ws_log("▶ 开始初始化独立的绿卡获取任务 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
@@ -143,28 +143,37 @@ class TaskManager:
         try:
             page = ChromiumPage(addr_or_opts=co)
             self.active_pages['cf_clearance'] = page
-            ws_log("✅ 浏览器已打开，请在弹出的窗口中等待或手动点击 CF 验证码！")
-            ws_log("⏳ 系统将自动监听过盾状态（最长等待 60 秒）...")
+            ws_log("✅ 浏览器已打开，正在尝试访问论坛...")
             
             page.get("https://x999x.me/")
             
-            # 简单监听 60 秒，看看是否成功进入论坛首页
+            # 延长监听至 120 秒，并且增加强制延迟，让人眼能看到主页
             passed = False
-            for _ in range(60):
+            for i in range(120):
                 await asyncio.sleep(1)
                 if not getattr(self, 'active_pages', {}).get('cf_clearance'):
-                    # 任务可能被提前中止
                     break
+                    
                 title = page.title or ""
-                if "Just a moment" not in title and "Cloudflare" not in title:
+                html = page.html or ""
+                
+                # 如果遇到 5秒盾，等待
+                if "Just a moment" in title or "Cloudflare" in title or "cf-turnstile" in html:
+                    if i % 5 == 0: ws_log("⏳ 仍在等待通过 CF 盾，如果出现验证码请手动勾选...")
+                    continue
+                    
+                # 只有真正看到论坛的特征元素（如头部导航栏、板块列表）才算成功
+                if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
                     passed = True
                     break
                     
             if passed:
-                ws_log("✅ 恭喜！成功检测到论坛首页，CF 绿卡已安全保存。")
-                ws_log("💡 你现在可以关闭此窗口，去【系统设置】开启无头模式愉快地爬取了！")
+                ws_log("✅ 恭喜！成功突破 CF 盾，已真实进入论坛首页。")
+                ws_log("👀 为确保 Cookie 稳固写入硬盘，浏览器将保持开启 5 秒钟...")
+                await asyncio.sleep(5)
+                ws_log("💡 绿卡已安全保存。你现在可以去【系统设置】开启无头模式愉快地爬取了！")
             else:
-                ws_log("⚠️ 60 秒内未检测到过盾成功，可能是网络慢或验证失败，请重试。")
+                ws_log("⚠️ 120 秒内未成功进入主页，绿卡获取失败。请检查网络或重试。")
                 
         except Exception as e:
             ws_log(f"❌ 浏览器启动或访问异常: {e}")
@@ -173,7 +182,7 @@ class TaskManager:
                 del self.active_pages['cf_clearance']
             try:
                 page.quit()
-                ws_log("⏹ 绿卡获取任务结束，浏览器已关闭。")
+                ws_log("⏹ 绿卡获取任务结束，浏览器已自动关闭。")
             except:
                 pass
 
