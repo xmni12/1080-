@@ -1,4 +1,4 @@
-import { Play, SquareSquare, StopCircle, ShieldCheck } from 'lucide-react';
+import { Play, SquareSquare, StopCircle, ShieldCheck, KeyRound } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
 import { LogConsole } from '../components/LogConsole';
 import axios from 'axios';
@@ -30,6 +30,14 @@ export function Tasks() {
     }
   };
 
+  const authorizeLogin = async () => {
+    try {
+      await axios.post('http://127.0.0.1:8000/api/tasks/authorize');
+    } catch (error) {
+      console.error('Failed to trigger authorize login:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -39,6 +47,12 @@ export function Tasks() {
             任务调度中心
           </h3>
           <div className="flex gap-3">
+            <button 
+              onClick={authorizeLogin}
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            >
+              <KeyRound className="w-4 h-4" /> 账号登录 / 状态接管
+            </button>
             <button 
               onClick={getCfClearance}
               className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
@@ -54,7 +68,7 @@ export function Tasks() {
           </div>
         </div>
         <p className="text-slate-500 mb-6 text-sm">
-          在此处手动触发后台爬虫任务。如果被拦截，请先点击获取绿卡以穿透防封控系统。
+          在此处手动触发后台爬虫任务。如果被拦截，请先点击获取绿卡以穿透防封控系统。若论坛需要账号，请点击账号登录进行授权。
         </p>
 
         <div className="flex flex-wrap gap-4">

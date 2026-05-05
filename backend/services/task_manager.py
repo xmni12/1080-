@@ -186,4 +186,59 @@ class TaskManager:
             except:
                 pass
 
+    async def login_authorize(self):
+        """
+        独立打开浏览器，无限等待用户手动完成登录与授权，直到用户关闭窗口
+        """
+        def ws_log(msg: str):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = "info"
+                if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'login_auth' in self.active_pages:
+            ws_log("❌ 授权登录窗口已经在运行中，请不要重复打开。")
+            return
+
+        ws_log("▶ 开始初始化独立的账号登录授权通道 (强制有头模式)...")
+        co = ChromiumOptions().set_local_port(9222)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            self.active_pages['login_auth'] = page
+            ws_log("✅ 浏览器已成功打开，正前往论坛首页。")
+            page.get("https://x999x.me/")
+            
+            ws_log("⏳ 请在弹出的浏览器中慢慢操作：1.通过 CF 验证(如有)；2.输入账号密码登录；3.勾选【自动登录/记住密码】。")
+            ws_log("💡 操作全部完成后，请【手动点击右上角 X 关闭浏览器窗口】，系统会自动保存你的授权状态。")
+            
+            # 无限循环检测浏览器是否被用户手动关闭
+            while True:
+                await asyncio.sleep(2)
+                if not getattr(self, 'active_pages', {}).get('login_auth'):
+                    break # 任务被后端提前中止
+                try:
+                    # 尝试获取页面标题，如果抛出异常说明窗口已经被关闭
+                    _ = page.title
+                except Exception:
+                    ws_log("✅ 检测到授权浏览器窗口已关闭。所有的 Cookie 和登录状态已安全落盘并持久化！")
+                    break
+                
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动或访问异常: {e}")
+        finally:
+            if 'login_auth' in self.active_pages:
+                del self.active_pages['login_auth']
+            try:
+                page.quit()
+                ws_log("⏹ 账号授权登录任务彻底结束。")
+            except:
+                pass
+
 task_manager = TaskManager()

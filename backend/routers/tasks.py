@@ -30,6 +30,14 @@ async def trigger_cf_clearance(background_tasks: BackgroundTasks):
     background_tasks.add_task(task_manager.get_cf_clearance)
     return {"status": "started"}
 
+@router.post("/authorize")
+async def trigger_authorize(background_tasks: BackgroundTasks):
+    """
+    触发独立的账号登录授权任务
+    """
+    background_tasks.add_task(task_manager.login_authorize)
+    return {"status": "started"}
+
 @router.post("/rename")
 async def trigger_rename(request: RenameRequest, background_tasks: BackgroundTasks):
     """
