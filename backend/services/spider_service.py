@@ -274,6 +274,10 @@ class DiscuzSpiderService:
                                 ext = ".torrent"
                             else:
                                 # 魔数不匹配任何已知压缩包或种子，说明大概率下载到了伪装成 200 的 HTML 报错页
+                                debug_file = os.path.join(save_path, f"debug_{code}.html")
+                                with open(debug_file, "wb") as f:
+                                    f.write(dl_resp.content)
+                                logger.error(f"[{code}] Invalid content dumped to {debug_file}")
                                 return "INVALID_FILE_CONTENT"
                             
                             safe_code = code.replace(":", "_").replace(" ", "_")
