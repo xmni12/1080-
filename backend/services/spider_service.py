@@ -42,9 +42,14 @@ class DiscuzSpiderService:
             logger.debug(f"Scroll error: {e}")
 
     async def check_code_exists_in_section(self, session: AsyncSession, section: str, code: str) -> bool:
-        stmt = select(DownloadRecord).where(DownloadRecord.section == section, DownloadRecord.code == code.upper())
+        stmt = select(DownloadRecord.id).where(DownloadRecord.section == section, DownloadRecord.code == code.upper())
         result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return result.first() is not None
+
+    async def check_code_exists_globally(self, session: AsyncSession, code: str) -> bool:
+        stmt = select(DownloadRecord.id).where(DownloadRecord.code == code.upper())
+        result = await session.execute(stmt)
+        return result.first() is not None
 
     async def save_record(self, session: AsyncSession, section: str, code: str, title: str, post_url: str):
         stmt = select(DownloadRecord).where(DownloadRecord.code == code.upper())
@@ -150,18 +155,25 @@ class DiscuzSpiderService:
                         is_upgrade = False
                         
                         async with db_lock:
+                            is_global_exists = await self.check_code_exists_globally(session, code)
+                            
                             if section_key == '4k':
-                                if code in downloaded_codes: skip_download = True
+                                if await self.check_code_exists_in_section(session, '4k', code):
+                                    skip_download = True
                                 elif await self.check_code_exists_in_section(session, 'hd', code):
                                     self._log(f"[检测升级] {code} 在 HD 库已存在，正在准备升级为 4K...")
                                     is_upgrade = True
+                                elif is_global_exists:
+                                    skip_download = True
                             elif section_key == 'hd':
-                                if code in downloaded_codes or await self.check_code_exists_in_section(session, '4k', code):
-                                    if await self.check_code_exists_in_section(session, '4k', code):
-                                        self._log(f"[避让] {code} 在 4K 库已存在，HD 版块跳过。")
+                                if await self.check_code_exists_in_section(session, '4k', code):
+                                    self._log(f"[避让] {code} 在 4K 库已存在，HD 版块跳过。")
+                                    skip_download = True
+                                elif is_global_exists:
                                     skip_download = True
                             else:
-                                if code in downloaded_codes: skip_download = True
+                                if is_global_exists:
+                                    skip_download = True
                         
                         if skip_download: return
                         
