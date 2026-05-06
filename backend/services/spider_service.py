@@ -243,6 +243,7 @@ class DiscuzSpiderService:
                     return "CF_BLOCKED"
                 
                 # 2. 正则提取附件链接
+                import html
                 hrefs = re.findall(r'href=["\']([^"\']*mod=attachment[^"\']*)["\']', html_text)
                 if not hrefs:
                     exts = ['.torrent', '.zip', '.rar', '.7z', '.tar', '.gz', '.txt']
@@ -251,6 +252,9 @@ class DiscuzSpiderService:
                 
                 if not hrefs:
                     return "NO_ATTACHMENT"
+                    
+                # 解码 HTML 实体，将 &amp; 还原为 &，否则参数无法被服务器识别
+                hrefs = [html.unescape(h) for h in hrefs]
                 
                 # 3. 纯代码极速下载真实附件
                 for href in hrefs:
