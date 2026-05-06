@@ -266,12 +266,40 @@ class DiscuzSpiderService:
                                 return "QUOTA_LIMIT"
                                 
                             cd = dl_resp.headers.get("content-disposition", "")
-                            ext = ".torrent"
-                            if "filename=" in cd:
-                                match = re.search(r'filename="?([^"]+)"?', cd)
-                                if match:
-                                    ext_match = os.path.splitext(match.group(1))[1]
-                                    if ext_match: ext = ext_match
+                            ext = ""
+                            
+                            # 1. 尝试使用增强正则提取 Content-Disposition 中的扩展名
+                            from urllib.parse import unquote
+                            match = re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^;"\'\r\n]+)', cd, re.IGNORECASE)
+                            if match:
+                                raw_filename = unquote(match.group(1))
+                                ext_match = os.path.splitext(raw_filename)[1]
+                                if ext_match: ext = ext_match
+                            
+                            # 2. 如果 header 提取失败，尝试从响应的 URL 路径中提取
+                            if not ext:
+                                parsed_url = urllib.parse.urlparse(str(dl_resp.url))
+                                ext_match = os.path.splitext(parsed_url.path)[1]
+                                if ext_match: ext = ext_match
+                            
+                            # 3. 如果响应 URL 没有，尝试从原始请求链接中提取
+                            if not ext:
+                                parsed_href = urllib.parse.urlparse(download_url)
+                                ext_match = os.path.splitext(parsed_href.path)[1]
+                                if ext_match: ext = ext_match
+                                
+                            # 4. 彻底的兜底方案
+                            if not ext:
+                                # 根据 Content-Type 猜测，或者默认 .rar 避免损坏用户预期的压缩包
+                                c_type = dl_resp.headers.get("content-type", "").lower()
+                                if "application/x-bittorrent" in c_type: ext = ".torrent"
+                                elif "application/zip" in c_type: ext = ".zip"
+                                elif "application/x-rar" in c_type or "application/rar" in c_type: ext = ".rar"
+                                else: ext = ".rar" # 用户的默认期望
+                            
+                            # 确保扩展名纯净
+                            ext = ext.split('?')[0].split('&')[0].lower()
+                            if not ext.startswith('.'): ext = '.' + ext
                             
                             safe_code = code.replace(":", "_").replace(" ", "_")
                             filename = f"{safe_code}{ext}"
@@ -289,17 +317,6 @@ class DiscuzSpiderService:
                         logger.error(f"HTTPX File Download failed for {code}: {e}")
                         continue
                         
-                return "NO_VALID_DOWNLOAD"
-                
-        except httpx.TimeoutException:
-            return "TIMEOUT"
-        except Exception as e:
-            logger.error(f"HTTPX Detail Fetch failed for {code}: {e}")
-            return "UNKNOWN_ERROR"
-
-    def stop(self):
-        self.stop_requested = True
-              
                 return "NO_VALID_DOWNLOAD"
                 
         except httpx.TimeoutException:
