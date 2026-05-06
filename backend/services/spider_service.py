@@ -100,11 +100,18 @@ class DiscuzSpiderService:
                 # --- CF 盾拦截检测 ---
                 page_title = self.page.title or ""
                 page_html = self.page.html or ""
-                if "Just a moment" in page_title or "Cloudflare" in page_title or "cf-turnstile" in page_html or "challenge-form" in page_html:
+                
+                is_cf = "Just a moment" in page_title or "请稍候" in page_title or "Cloudflare" in page_title or "challenges.cloudflare.com" in page_html or "cf-turnstile" in page_html
+                
+                if is_cf:
                     self._log("🚨 遭遇 CF 盾拦截！无法获取论坛帖子。")
-                    self._log("💡 建议：请在【系统设置】中【关闭】“无头静默运行”，然后重新启动任务。在弹出的浏览器中手动勾选一次验证码，系统会自动保存绿卡，之后便可畅通无阻！")
+                    self._log("💡 建议：请前往【任务调度中心】点击【获取长效 CF 绿卡】按钮，手动通过一次验证。")
                     self.stop_requested = True
                     break
+                    
+                is_forum = "mod=viewthread" in page_html or "forumdisplay" in page_html or "portal.php" in page_html or "forum.php" in page_html or "首页" in page_title
+                if not is_forum:
+                    self._log(f"⚠️ 警告：当前页面似乎不是论坛页面，标题为: {page_title[:20]}")
                 
                 tasks = []
                 seen_tids = set()
