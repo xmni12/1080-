@@ -213,8 +213,13 @@ class DiscuzSpiderService:
         import httpx
         import urllib.parse
 
-        cookies_list = self.page.cookies(as_dict=False)
-        cookies_dict = {c['name']: c['value'] for c in cookies_list}
+        try:
+            cookies_dict = self.page.cookies().as_dict()
+        except TypeError:
+            # 兼容老版本 DrissionPage
+            cookies_list = self.page.cookies(as_dict=False)
+            cookies_dict = {c['name']: c['value'] for c in cookies_list}
+            
         headers = {
             "User-Agent": self.page.user_agent,
             "Referer": "https://x999x.me/forum.php"
@@ -284,6 +289,17 @@ class DiscuzSpiderService:
                         logger.error(f"HTTPX File Download failed for {code}: {e}")
                         continue
                         
+                return "NO_VALID_DOWNLOAD"
+                
+        except httpx.TimeoutException:
+            return "TIMEOUT"
+        except Exception as e:
+            logger.error(f"HTTPX Detail Fetch failed for {code}: {e}")
+            return "UNKNOWN_ERROR"
+
+    def stop(self):
+        self.stop_requested = True
+              
                 return "NO_VALID_DOWNLOAD"
                 
         except httpx.TimeoutException:
