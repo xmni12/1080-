@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 
 from backend.database import get_db
 from backend.models import DownloadRecord
-from backend.schemas import RecordResponse, ManualEntryRequest, DeleteRequest
+from backend.schemas import RecordResponse, PaginatedRecordResponse, ManualEntryRequest, DeleteRequest
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -37,10 +37,12 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
             
     return stats
 
-@router.get("/", response_model=List[RecordResponse])
+@router.get("/", response_model=PaginatedRecordResponse)
 async def get_records(
     section: Optional[str] = None,
     search: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(DownloadRecord)
@@ -52,9 +54,17 @@ async def get_records(
         search_term = f"%{search}%"
         stmt = stmt.where((DownloadRecord.code.ilike(search_term)) | (DownloadRecord.title.ilike(search_term)))
         
-    result = await db.execute(stmt.order_by(DownloadRecord.download_time.desc()).limit(300))
+    # Count total
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+    
+    # Paginate
+    stmt = stmt.order_by(DownloadRecord.download_time.desc()).offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
     records = result.scalars().all()
-    return records
+    
+    return {"total": total, "items": records}
 
 @router.post("/manual")
 async def add_manual_records(request: ManualEntryRequest, db: AsyncSession = Depends(get_db)):

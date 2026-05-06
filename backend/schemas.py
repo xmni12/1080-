@@ -14,6 +14,12 @@ class RecordResponse(RecordBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+from typing import List
+
+class PaginatedRecordResponse(BaseModel):
+    total: int
+    items: List[RecordResponse]
+
 class ManualEntryRequest(BaseModel):
     codes: str
     section: str

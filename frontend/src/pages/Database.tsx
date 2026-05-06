@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Database as DatabaseIcon, DownloadCloud, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter } from 'lucide-react';
+import { Search, Database as DatabaseIcon, DownloadCloud, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 
@@ -18,12 +18,15 @@ interface Stats {
 
 export function Database() {
   const [records, setRecords] = useState<Record[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // 筛选器状态
+  // 筛选与分页状态
   const [filterSection, setFilterSection] = useState('all');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   
   // 手动录入与删除状态
   const [manualCodes, setManualCodes] = useState('');
@@ -33,19 +36,35 @@ export function Database() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  // 当筛选条件或页大小改变时，重置页码到1
   useEffect(() => {
-    fetchData();
-  }, [filterSection]);
+    setPage(1);
+  }, [filterSection, search, pageSize]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchData();
+    }, 300); // 搜索防抖
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filterSection, search, page, pageSize]);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      // 并发请求数据和大盘统计
       const [recordsRes, statsRes] = await Promise.all([
-        axios.get(`http://127.0.0.1:8000/api/records/`, { params: { section: filterSection } }),
+        axios.get(`http://127.0.0.1:8000/api/records/`, { 
+          params: { 
+            section: filterSection,
+            search: search,
+            page: page,
+            page_size: pageSize
+          } 
+        }),
         axios.get('http://127.0.0.1:8000/api/records/stats')
       ]);
-      setRecords(recordsRes.data);
+      setRecords(recordsRes.data.items);
+      setTotalRecords(recordsRes.data.total);
       setStats(statsRes.data);
       setSelectedIds(new Set());
     } catch (error) {
@@ -74,12 +93,6 @@ export function Database() {
     }
   };
 
-  // 客户端辅助搜索过滤（后端最多返回300条，客户端过滤更流畅）
-  const filteredRecords = records.filter(r => 
-    r.code.toLowerCase().includes(search.toLowerCase()) || 
-    (r.title && r.title.toLowerCase().includes(search.toLowerCase()))
-  );
-
   const toggleSelect = (id: number) => {
     const newSet = new Set(selectedIds);
     if (newSet.has(id)) newSet.delete(id);
@@ -88,10 +101,10 @@ export function Database() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredRecords.length && filteredRecords.length > 0) {
+    if (selectedIds.size === records.length && records.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+      setSelectedIds(new Set(records.map(r => r.id)));
     }
   };
 
@@ -113,6 +126,8 @@ export function Database() {
       setIsDeleting(false);
     }
   };
+
+  const totalPages = Math.ceil(totalRecords / pageSize);
 
   const StatCard = ({ title, sectionKey, icon: Icon, colorClass, bgClass }) => {
     const data = stats?.[sectionKey] || { total: 0, today: 0 };
@@ -246,7 +261,7 @@ export function Database() {
                   <th className="px-5 py-3 font-medium w-10 text-center">
                     <input 
                       type="checkbox"
-                      checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
+                      checked={selectedIds.size === records.length && records.length > 0}
                       onChange={toggleSelectAll}
                       className="w-3.5 h-3.5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
                     />
@@ -262,17 +277,17 @@ export function Database() {
                   <tr>
                     <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 opacity-50 text-primary" />
-                      正在加载并统计数据...
+                      正在加载数据...
                     </td>
                   </tr>
-                ) : filteredRecords.length === 0 ? (
+                ) : records.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-12 text-center text-slate-400 italic">
                       没有找到对应的档案记录
                     </td>
                   </tr>
                 ) : (
-                  filteredRecords.map(record => (
+                  records.map(record => (
                     <tr 
                       key={record.id} 
                       onClick={() => toggleSelect(record.id)}
@@ -310,8 +325,51 @@ export function Database() {
               </tbody>
             </table>
           </div>
-        </div>
 
+          {/* 表格分页底部 */}
+          <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-slate-500">
+                共 <span className="font-semibold text-slate-700">{totalRecords}</span> 条记录
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">每页显示</span>
+                <select 
+                  value={pageSize}
+                  onChange={e => setPageSize(Number(e.target.value))}
+                  className="bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md px-2 py-1 outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-xs text-slate-500">条</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || isLoading}
+                className="p-1 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-xs font-medium text-slate-700 px-3">
+                {page} / {totalPages > 0 ? totalPages : 1}
+              </span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isLoading}
+                className="p-1 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
