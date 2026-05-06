@@ -277,16 +277,17 @@ class DiscuzSpiderService:
                                 if ext_match: ext = ext_match
                             
                             # 2. 如果 header 提取失败，尝试从响应的 URL 路径中提取
+                            invalid_exts = {'.php', '.html', '.htm', '.aspx', '.jsp', '.jspx', '.do', '.action'}
                             if not ext:
                                 parsed_url = urllib.parse.urlparse(str(dl_resp.url))
-                                ext_match = os.path.splitext(parsed_url.path)[1]
-                                if ext_match: ext = ext_match
+                                ext_match = os.path.splitext(parsed_url.path)[1].lower()
+                                if ext_match and ext_match not in invalid_exts: ext = ext_match
                             
                             # 3. 如果响应 URL 没有，尝试从原始请求链接中提取
                             if not ext:
                                 parsed_href = urllib.parse.urlparse(download_url)
-                                ext_match = os.path.splitext(parsed_href.path)[1]
-                                if ext_match: ext = ext_match
+                                ext_match = os.path.splitext(parsed_href.path)[1].lower()
+                                if ext_match and ext_match not in invalid_exts: ext = ext_match
                                 
                             # 4. 彻底的兜底方案
                             if not ext:
