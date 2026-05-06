@@ -88,11 +88,17 @@ class TaskManager:
         co.set_user_data_path(profile_path)
         
         if hide_browser: 
-            ws_log("已开启无头静默模式运行。")
-            co.headless()
+            ws_log("已开启无头静默模式运行 (采用伪装模式防指纹泄露)。")
+            # 不使用 co.headless() 防止指纹发生变化，改将窗口移出屏幕外
+            co.set_argument('--window-position=-32000,-32000')
             
         try:
             page = ChromiumPage(addr_or_opts=co)
+            if hide_browser:
+                # 进一步将窗口最小化
+                try: page.set.window.minimized()
+                except: pass
+            
             self.active_pages[section_key] = page
             ws_log("✅ DrissionPage 浏览器内核启动成功 (已加载绿卡持久化环境)。")
         except Exception as e:
