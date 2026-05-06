@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from typing import List
-from datetime import datetime
+from sqlalchemy import select, delete, func, case
+from typing import List, Optional
+from datetime import datetime, date, time
 
 from backend.database import get_db
 from backend.models import DownloadRecord
@@ -10,9 +10,49 @@ from backend.schemas import RecordResponse, ManualEntryRequest, DeleteRequest
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
+@router.get("/stats")
+async def get_stats(db: AsyncSession = Depends(get_db)):
+    # 获取各个版块的总量和今日新增
+    today_start = datetime.combine(date.today(), time.min)
+    
+    stmt = select(
+        DownloadRecord.section,
+        func.count(DownloadRecord.id).label('total'),
+        func.sum(case((DownloadRecord.download_time >= today_start, 1), else_=0)).label('today')
+    ).group_by(DownloadRecord.section)
+    
+    result = await db.execute(stmt)
+    stats = {}
+    for row in result.all():
+        section = row[0]
+        stats[section] = {
+            "total": row[1],
+            "today": int(row[2]) if row[2] else 0
+        }
+    
+    # 保证四个基础版块都存在
+    for sec in ['vr', '4k', 'hd', 'sub']:
+        if sec not in stats:
+            stats[sec] = {"total": 0, "today": 0}
+            
+    return stats
+
 @router.get("/", response_model=List[RecordResponse])
-async def get_records(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(DownloadRecord).order_by(DownloadRecord.download_time.desc()).limit(300))
+async def get_records(
+    section: Optional[str] = None,
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(DownloadRecord)
+    
+    if section and section != 'all':
+        stmt = stmt.where(DownloadRecord.section == section)
+        
+    if search:
+        search_term = f"%{search}%"
+        stmt = stmt.where((DownloadRecord.code.ilike(search_term)) | (DownloadRecord.title.ilike(search_term)))
+        
+    result = await db.execute(stmt.order_by(DownloadRecord.download_time.desc()).limit(300))
     records = result.scalars().all()
     return records
 

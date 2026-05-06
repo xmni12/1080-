@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Database as DatabaseIcon, DownloadCloud, PlusCircle, Loader2, Trash2 } from 'lucide-react';
+import { Search, Database as DatabaseIcon, DownloadCloud, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter } from 'lucide-react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 
@@ -12,11 +12,20 @@ interface Record {
   title?: string;
 }
 
+interface Stats {
+  [key: string]: { total: number; today: number };
+}
+
 export function Database() {
   const [records, setRecords] = useState<Record[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 筛选器状态
+  const [filterSection, setFilterSection] = useState('all');
   const [search, setSearch] = useState('');
   
+  // 手动录入与删除状态
   const [manualCodes, setManualCodes] = useState('');
   const [manualSection, setManualSection] = useState('4k');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,17 +34,22 @@ export function Database() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    fetchRecords();
-  }, []);
+    fetchData();
+  }, [filterSection]);
 
-  const fetchRecords = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('http://127.0.0.1:8000/api/records/');
-      setRecords(response.data);
+      // 并发请求数据和大盘统计
+      const [recordsRes, statsRes] = await Promise.all([
+        axios.get(`http://127.0.0.1:8000/api/records/`, { params: { section: filterSection } }),
+        axios.get('http://127.0.0.1:8000/api/records/stats')
+      ]);
+      setRecords(recordsRes.data);
+      setStats(statsRes.data);
       setSelectedIds(new Set());
     } catch (error) {
-      console.error('Failed to fetch records', error);
+      console.error('Failed to fetch data', error);
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +65,7 @@ export function Database() {
       });
       alert(`成功录入了 ${response.data.added} 个番号！`);
       setManualCodes('');
-      fetchRecords();
+      fetchData();
     } catch (error) {
       console.error('Failed to add manual records', error);
       alert('录入失败，请检查后端运行状态。');
@@ -60,6 +74,7 @@ export function Database() {
     }
   };
 
+  // 客户端辅助搜索过滤（后端最多返回300条，客户端过滤更流畅）
   const filteredRecords = records.filter(r => 
     r.code.toLowerCase().includes(search.toLowerCase()) || 
     (r.title && r.title.toLowerCase().includes(search.toLowerCase()))
@@ -90,7 +105,7 @@ export function Database() {
         ids: Array.from(selectedIds)
       });
       alert(`成功删除了 ${response.data.deleted} 个番号！`);
-      fetchRecords();
+      fetchData();
     } catch (error) {
       console.error('Failed to delete records', error);
       alert('删除失败，请检查后端运行状态。');
@@ -99,21 +114,61 @@ export function Database() {
     }
   };
 
+  const StatCard = ({ title, sectionKey, icon: Icon, colorClass, bgClass }) => {
+    const data = stats?.[sectionKey] || { total: 0, today: 0 };
+    const isActive = filterSection === sectionKey;
+    
+    return (
+      <div 
+        onClick={() => setFilterSection(isActive ? 'all' : sectionKey)}
+        className={clsx(
+          "flex-1 p-4 rounded-2xl border transition-all cursor-pointer",
+          isActive 
+            ? `ring-2 ring-offset-2 ${colorClass.replace('text-', 'ring-')} ${bgClass} border-transparent shadow-md` 
+            : "bg-white border-slate-100 hover:border-slate-300 hover:shadow-sm"
+        )}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className={clsx("p-2 rounded-xl", bgClass)}>
+            <Icon className={clsx("w-5 h-5", colorClass)} />
+          </div>
+          {data.today > 0 && (
+            <span className="text-xs font-semibold bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">
+              今日 +{data.today}
+            </span>
+          )}
+        </div>
+        <h4 className="text-slate-500 text-sm font-medium mb-1">{title} 库存</h4>
+        <div className="text-2xl font-bold text-slate-800">{data.total} <span className="text-sm font-normal text-slate-400">部</span></div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full gap-6">
-      <div className="flex gap-6">
-        <div className="w-1/3 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <PlusCircle className="w-5 h-5 text-primary" />
-            手动录入番号
+      
+      {/* 顶部：数据大盘概览卡片 */}
+      <div className="flex gap-4">
+        <StatCard title="VR 虚拟现实" sectionKey="vr" icon={MonitorPlay} colorClass="text-purple-600" bgClass="bg-purple-100" />
+        <StatCard title="4K 超高清" sectionKey="4k" icon={LayoutGrid} colorClass="text-blue-600" bgClass="bg-blue-100" />
+        <StatCard title="HD 高清有码" sectionKey="hd" icon={Film} colorClass="text-amber-600" bgClass="bg-amber-100" />
+        <StatCard title="Sub 外挂字幕" sectionKey="sub" icon={Languages} colorClass="text-emerald-600" bgClass="bg-emerald-100" />
+      </div>
+
+      <div className="flex gap-6 h-full min-h-0">
+        {/* 左侧：手动录入 */}
+        <div className="w-1/4 bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col h-fit">
+          <h3 className="text-md font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <PlusCircle className="w-4 h-4 text-primary" />
+            快速补录
           </h3>
           <div className="space-y-4 flex-1 flex flex-col">
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-slate-700 shrink-0">所属版块</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-slate-500">归属版块</label>
               <select 
                 value={manualSection}
                 onChange={e => setManualSection(e.target.value)}
-                className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary"
+                className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary"
               >
                 <option value="4k">4K 超清</option>
                 <option value="vr">VR 视频</option>
@@ -121,133 +176,142 @@ export function Database() {
                 <option value="sub">外挂字幕</option>
               </select>
             </div>
-            <textarea 
-              value={manualCodes}
-              onChange={(e) => setManualCodes(e.target.value)}
-              className="w-full flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none min-h-[100px]"
-              placeholder="支持批量录入，一行一个番号..."
-            />
+            <div className="flex flex-col gap-2 flex-1">
+              <label className="text-xs font-medium text-slate-500">番号列表 (每行一个)</label>
+              <textarea 
+                value={manualCodes}
+                onChange={(e) => setManualCodes(e.target.value)}
+                className="w-full flex-1 p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none min-h-[150px]"
+                placeholder="例如：&#10;SSNI-123&#10;MIDE-456"
+              />
+            </div>
             <button 
               onClick={handleManualSubmit}
               disabled={isSubmitting || !manualCodes.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 disabled:bg-slate-300 text-white py-2.5 rounded-xl font-medium transition-colors shadow-sm"
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 disabled:bg-slate-300 text-white py-2 rounded-xl text-sm font-medium transition-colors shadow-sm mt-2"
             >
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "确 认 录 入"}
             </button>
           </div>
         </div>
 
-        <div className="w-2/3 flex flex-col justify-center bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between">
+        {/* 右侧：全能筛选表格 */}
+        <div className="w-3/4 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          
+          {/* 表格工具栏 */}
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-3 rounded-xl">
-                <DatabaseIcon className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+                <ListFilter className="w-4 h-4 text-slate-400" />
+                <select 
+                  value={filterSection}
+                  onChange={(e) => setFilterSection(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="all">所有版块记录</option>
+                  <option value="vr">VR 专属记录</option>
+                  <option value="4k">4K 专属记录</option>
+                  <option value="hd">HD 专属记录</option>
+                  <option value="sub">字幕 专属记录</option>
+                </select>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800">本地番号仓库</h3>
-                <p className="text-sm text-slate-500">共收录 {records.length} 条数据记录</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              
+              <div className="relative w-56">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="搜索番号或标题..."
+                  placeholder="搜索番号或帖子标题..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                 />
               </div>
-              <button 
-                onClick={handleBulkDelete}
-                disabled={selectedIds.size === 0 || isDeleting}
-                className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition-colors border border-rose-100"
-                title="删除选中"
-              >
-                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                批量删除 ({selectedIds.size})
-              </button>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 shadow-sm z-10">
-              <tr className="text-slate-500 text-sm">
-                <th className="px-6 py-4 font-medium w-12 text-center">
-                  <input 
-                    type="checkbox"
-                    checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
-                  />
-                </th>
-                <th className="px-6 py-4 font-medium">编号 (ID)</th>
-                <th className="px-6 py-4 font-medium">核心番号</th>
-                <th className="px-6 py-4 font-medium">所属版块</th>
-                <th className="px-6 py-4 font-medium">原始帖子标题</th>
-                <th className="px-6 py-4 font-medium">入库时间</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    <DownloadCloud className="w-8 h-8 animate-bounce mx-auto mb-2 opacity-50" />
-                    正在加载数据...
-                  </td>
+            <button 
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0 || isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
+            >
+              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              删除 ({selectedIds.size})
+            </button>
+          </div>
+
+          {/* 表格主体 */}
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-white border-b border-slate-100 z-10 shadow-sm">
+                <tr className="text-slate-500 text-xs uppercase tracking-wider">
+                  <th className="px-5 py-3 font-medium w-10 text-center">
+                    <input 
+                      type="checkbox"
+                      checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-3.5 h-3.5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-5 py-3 font-medium">核心番号</th>
+                  <th className="px-5 py-3 font-medium">版块</th>
+                  <th className="px-5 py-3 font-medium">原始帖子标题</th>
+                  <th className="px-5 py-3 font-medium">入库时间</th>
                 </tr>
-              ) : filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
-                    没有找到匹配的记录
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map(record => (
-                  <tr 
-                    key={record.id} 
-                    onClick={() => toggleSelect(record.id)}
-                    className={clsx(
-                      "transition-colors cursor-pointer",
-                      selectedIds.has(record.id) ? "bg-blue-50/50" : "hover:bg-slate-50/80"
-                    )}
-                  >
-                    <td className="px-6 py-4 text-center">
-                      <input 
-                        type="checkbox"
-                        checked={selectedIds.has(record.id)}
-                        onChange={() => toggleSelect(record.id)}
-                        onClick={e => e.stopPropagation()}
-                        className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">#{record.id}</td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-primary">{record.code}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium uppercase">
-                        {record.section}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-700 truncate max-w-xs" title={record.title}>
-                      {record.title || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">
-                      {new Date(record.download_time).toLocaleString()}
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 opacity-50 text-primary" />
+                      正在加载并统计数据...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-12 text-center text-slate-400 italic">
+                      没有找到对应的档案记录
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecords.map(record => (
+                    <tr 
+                      key={record.id} 
+                      onClick={() => toggleSelect(record.id)}
+                      className={clsx(
+                        "transition-colors cursor-pointer",
+                        selectedIds.has(record.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"
+                      )}
+                    >
+                      <td className="px-5 py-3 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedIds.has(record.id)}
+                          onChange={() => toggleSelect(record.id)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-3.5 h-3.5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="font-bold text-slate-800">{record.code}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px] font-bold uppercase">
+                          {record.section}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-slate-600 truncate max-w-[200px]" title={record.title}>
+                        {record.title || '-'}
+                      </td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">
+                        {new Date(record.download_time).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+
       </div>
     </div>
   );
