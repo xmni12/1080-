@@ -205,36 +205,67 @@ class DiscuzSpiderService:
             self.page.get(detail_url)
             await self._human_delay(config, 2.5, 5.0)
             await self._human_scroll(config)
-            self.page.set.download_path(os.path.abspath(save_path))
-            files_before = set(os.listdir(save_path)) if os.path.exists(save_path) else set()
-            
+
             attach_eles = self.page.eles('css:a[href*="mod=attachment"]')
             if not attach_eles:
                 exts = ['.torrent', '.zip', '.rar', '.7z', '.tar', '.gz', '.txt']
                 attach_eles = [l for l in self.page.eles('tag:a') if any(ext in (l.attr('href') or '').lower() for ext in exts)]
-            
+
             if not attach_eles: return "FAILED"
-            
+
+            # 使用协议级纯代码极速下载，保障原子性
+            import httpx
+            import urllib.parse
+
+            cookies_list = self.page.cookies(as_dict=False)
+            cookies_dict = {c['name']: c['value'] for c in cookies_list}
+            headers = {
+                "User-Agent": self.page.user_agent,
+                "Referer": detail_url
+            }
+
             for att in attach_eles:
                 try:
                     await self._human_delay(config, 0.5, 1.5)
-                    att.click()
-                    # 等待下载完成，原逻辑是轮询文件系统
-                    for _ in range(15):
-                        await asyncio.sleep(1)
-                        if "mod=attachment" in self.page.url and any(ind in self.page.html for ind in ["已超出", "總計", "权限", "次数已满"]):
-                            return "QUOTA_LIMIT"
-                        
-                        files_now = set(os.listdir(save_path))
-                        new_files = [f for f in (files_now - files_before) if not f.endswith(('.tmp', '.crdownload'))]
-                        if new_files:
+                    href = att.attr('href')
+                    if not href: continue
+                    download_url = href if href.startswith('http') else urllib.parse.urljoin("https://x999x.me/", href)
+
+                    async with httpx.AsyncClient(cookies=cookies_dict, headers=headers, verify=False, timeout=30.0) as client:
+                        resp = await client.get(download_url, follow_redirects=True)
+
+                        if resp.status_code == 200:
+                            html_text = resp.text
+                            # 校验是否跳转到错误提示页
+                            if any(ind in html_text for ind in ["已超出", "總計", "权限", "次数已满"]):
+                                return "QUOTA_LIMIT"
+
+                            # 获取附件真实名字，如果没有则默认 code.torrent
+                            cd = resp.headers.get("content-disposition", "")
+                            ext = ".torrent"
+                            if "filename=" in cd:
+                                match = re.search(r'filename="?([^"]+)"?', cd)
+                                if match:
+                                    ext_match = os.path.splitext(match.group(1))[1]
+                                    if ext_match: ext = ext_match
+
+                            safe_code = code.replace(":", "_").replace(" ", "_")
+                            filename = f"{safe_code}{ext}"
+                            file_path = os.path.join(save_path, filename)
+
+                            with open(file_path, "wb") as f:
+                                f.write(resp.content)
+
+                            # 原子性落盘完成，确认100%成功
                             return "SUCCESS"
-                except:
+
+                except Exception as e:
+                    logger.error(f"HTTPX Download failed for {code}: {e}")
                     continue
+
             return "FAILED"
         except Exception as e:
             logger.error(f"Download attachments failed for {code}: {e}")
             return "FAILED"
-
     def stop(self):
         self.stop_requested = True

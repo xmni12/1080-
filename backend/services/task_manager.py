@@ -95,8 +95,8 @@ class TaskManager:
         try:
             page = ChromiumPage(addr_or_opts=co)
             if hide_browser:
-                # 进一步将窗口最小化
-                try: page.set.window.minimized()
+                # 进一步将窗口彻底隐藏 (从任务栏蒸发)
+                try: page.set.window.hide()
                 except: pass
             
             self.active_pages[section_key] = page
