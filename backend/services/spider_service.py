@@ -260,47 +260,21 @@ class DiscuzSpiderService:
                         
                         dl_resp = await client.get(download_url, follow_redirects=True)
                         if dl_resp.status_code == 200:
-                            dl_html_text = dl_resp.text
-                            # 校验是否重定向到了错误页
-                            if any(ind in dl_html_text for ind in ["已超出", "總計", "权限", "次数已满"]):
-                                return "QUOTA_LIMIT"
-                                
-                            cd = dl_resp.headers.get("content-disposition", "")
+                            content_head = dl_resp.content[:50]
                             ext = ""
                             
-                            # 1. 尝试使用增强正则提取 Content-Disposition 中的扩展名
-                            from urllib.parse import unquote
-                            match = re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^;"\'\r\n]+)', cd, re.IGNORECASE)
-                            if match:
-                                raw_filename = unquote(match.group(1))
-                                ext_match = os.path.splitext(raw_filename)[1]
-                                if ext_match: ext = ext_match
-                            
-                            # 2. 如果 header 提取失败，尝试从响应的 URL 路径中提取
-                            invalid_exts = {'.php', '.html', '.htm', '.aspx', '.jsp', '.jspx', '.do', '.action'}
-                            if not ext:
-                                parsed_url = urllib.parse.urlparse(str(dl_resp.url))
-                                ext_match = os.path.splitext(parsed_url.path)[1].lower()
-                                if ext_match and ext_match not in invalid_exts: ext = ext_match
-                            
-                            # 3. 如果响应 URL 没有，尝试从原始请求链接中提取
-                            if not ext:
-                                parsed_href = urllib.parse.urlparse(download_url)
-                                ext_match = os.path.splitext(parsed_href.path)[1].lower()
-                                if ext_match and ext_match not in invalid_exts: ext = ext_match
-                                
-                            # 4. 彻底的兜底方案
-                            if not ext:
-                                # 根据 Content-Type 猜测，或者默认 .rar 避免损坏用户预期的压缩包
-                                c_type = dl_resp.headers.get("content-type", "").lower()
-                                if "application/x-bittorrent" in c_type: ext = ".torrent"
-                                elif "application/zip" in c_type: ext = ".zip"
-                                elif "application/x-rar" in c_type or "application/rar" in c_type: ext = ".rar"
-                                else: ext = ".rar" # 用户的默认期望
-                            
-                            # 确保扩展名纯净
-                            ext = ext.split('?')[0].split('&')[0].lower()
-                            if not ext.startswith('.'): ext = '.' + ext
+                            # 方案二：穿透检测真实文件魔数 (Magic Number)
+                            if content_head.startswith(b'Rar!\x1a\x07'):
+                                ext = ".rar"
+                            elif content_head.startswith(b'PK\x03\x04'):
+                                ext = ".zip"
+                            elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'):
+                                ext = ".7z"
+                            elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head:
+                                ext = ".torrent"
+                            else:
+                                # 魔数不匹配任何已知压缩包或种子，说明大概率下载到了伪装成 200 的 HTML 报错页
+                                return "INVALID_FILE_CONTENT"
                             
                             safe_code = code.replace(":", "_").replace(" ", "_")
                             filename = f"{safe_code}{ext}"
