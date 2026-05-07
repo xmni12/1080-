@@ -1,17 +1,28 @@
-import { useState, useRef, DragEvent } from 'react';
+import { useState, useEffect, DragEvent } from 'react';
 import { UploadCloud, Image as ImageIcon, Search, ShieldAlert, Trash2, Plus, AlertCircle, FileVideo } from 'lucide-react';
 import { clsx } from 'clsx';
-
-// 模拟初始的女优黑名单数据
-const initialBlacklist = ['三上悠亚', '桥本有菜', '深田咏美'];
+import axios from 'axios';
 
 export function Lab() {
   const [isDragging, setIsDragging] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [result, setResult] = useState<any>(null);
   
-  const [blacklist, setBlacklist] = useState<string[]>(initialBlacklist);
+  const [blacklist, setBlacklist] = useState<string[]>([]);
   const [newActorName, setNewActorName] = useState('');
+  
+  useEffect(() => {
+    fetchBlacklist();
+  }, []);
+
+  const fetchBlacklist = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/lab/blacklist');
+      setBlacklist(res.data.map((item: any) => item.name));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -32,47 +43,48 @@ export function Lab() {
     }
   };
 
-  const simulateRecognition = (filename: string) => {
+  const simulateRecognition = async (filename: string) => {
     setIsRecognizing(true);
     setResult(null);
     
-    // 模拟网络刮削延迟 1.5s
-    setTimeout(() => {
-      // 假数据逻辑
-      let code = "SSNI-123";
-      let actor = "三上悠亚";
-      
-      // 如果文件名带有特定的字符，换个假数据演示
-      if (filename.toLowerCase().includes('abp')) {
-         code = "ABP-999";
-         actor = "未知名新人";
-      } else if (filename.toLowerCase().includes('ssis')) {
-         code = "SSIS-001";
-         actor = "桥本有菜";
-      }
-
-      setResult({
-        filename: filename,
-        code: code,
-        actor: actor,
-        cover: "https://picsum.photos/seed/picsum/400/600", // 假封面
-      });
-      setIsRecognizing(false);
-    }, 1500);
-  };
-
-  const handleAddBlacklist = () => {
-    if (newActorName.trim() && !blacklist.includes(newActorName.trim())) {
-      setBlacklist([...blacklist, newActorName.trim()]);
-      setNewActorName('');
+    try {
+        const res = await axios.post('http://127.0.0.1:8000/api/lab/recognize', { filename });
+        setResult({
+            filename: filename,
+            code: res.data.code,
+            actor: res.data.actor,
+            cover: res.data.cover_url
+        });
+    } catch (error: any) {
+        console.error(error);
+        alert(error.response?.data?.detail || "刮削失败，请检查后端日志");
+    } finally {
+        setIsRecognizing(false);
     }
   };
 
-  const handleRemoveBlacklist = (actor: string) => {
-    setBlacklist(blacklist.filter(a => a !== actor));
+  const handleAddBlacklist = async () => {
+    if (newActorName.trim() && !blacklist.includes(newActorName.trim())) {
+      try {
+          await axios.post('http://127.0.0.1:8000/api/lab/blacklist', { name: newActorName.trim() });
+          setBlacklist([...blacklist, newActorName.trim()]);
+          setNewActorName('');
+      } catch (e) {
+          console.error(e);
+      }
+    }
   };
 
-  const isBlocked = result && blacklist.includes(result.actor);
+  const handleRemoveBlacklist = async (actor: string) => {
+    try {
+        await axios.delete(`http://127.0.0.1:8000/api/lab/blacklist/${actor}`);
+        setBlacklist(blacklist.filter(a => a !== actor));
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  const isBlocked = result && result.actor && blacklist.some(b => result.actor.includes(b));
 
   return (
     <div className="flex gap-6 h-full min-h-[calc(100vh-140px)]">
