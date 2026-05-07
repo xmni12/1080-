@@ -96,6 +96,15 @@ export function Settings() {
               />
             </div>
             <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">每日爬取配额 (达到数量后自动停止)</label>
+              <input 
+                type="number" 
+                value={config.sections[section]?.daily_limit || 55}
+                onChange={e => updateSection(section, 'daily_limit', Number(e.target.value))}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-slate-700">文件保存绝对路径</label>
               <input 
                 type="text" 

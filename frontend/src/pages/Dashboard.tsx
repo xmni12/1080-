@@ -1,42 +1,87 @@
-import { MonitorPlay, Film, Tv, FileText, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MonitorPlay, Film, Tv, FileText, Activity, Loader2 } from 'lucide-react';
 import { QuotaCard } from '../components/QuotaCard';
+import axios from 'axios';
 
 export function Dashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [statsRes, settingsRes] = await Promise.all([
+          axios.get('http://127.0.0.1:8000/api/records/stats'),
+          axios.get('http://127.0.0.1:8000/api/settings')
+        ]);
+        setStats(statsRes.data);
+        setSettings(settingsRes.data);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const getQuotaData = (sectionKey: string) => {
+    const current = stats?.[sectionKey]?.today || 0;
+    const max = settings?.sections?.[sectionKey]?.daily_limit || 55;
+    return { current, max };
+  };
+
+  const quota4K = getQuotaData('4k');
+  const quotaVR = getQuotaData('vr');
+  const quotaHD = getQuotaData('hd');
+  const quotaSub = getQuotaData('sub');
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <QuotaCard 
-          title="4K 超清" 
-          current={12} 
-          max={55} 
-          icon={MonitorPlay}
-          colorClass="text-emerald-500"
-          bgClass="bg-emerald-50"
-        />
-        <QuotaCard 
-          title="VR 视频" 
-          current={45} 
-          max={55} 
-          icon={Tv}
-          colorClass="text-cyan-500"
-          bgClass="bg-cyan-50"
-        />
-        <QuotaCard 
-          title="高清有码" 
-          current={55} 
-          max={55} 
-          icon={Film}
-          colorClass="text-blue-500"
-          bgClass="bg-blue-50"
-        />
-        <QuotaCard 
-          title="外挂字幕" 
-          current={3} 
-          max={55} 
-          icon={FileText}
-          colorClass="text-rose-500"
-          bgClass="bg-rose-50"
-        />
+        {isLoading ? (
+          <div className="col-span-full py-12 flex justify-center items-center text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <span className="ml-3 font-medium">正在实时加载系统大盘数据...</span>
+          </div>
+        ) : (
+          <>
+            <QuotaCard 
+              title="4K 超清" 
+              current={quota4K.current} 
+              max={quota4K.max} 
+              icon={MonitorPlay}
+              colorClass="text-emerald-500"
+              bgClass="bg-emerald-50"
+            />
+            <QuotaCard 
+              title="VR 视频" 
+              current={quotaVR.current} 
+              max={quotaVR.max} 
+              icon={Tv}
+              colorClass="text-cyan-500"
+              bgClass="bg-cyan-50"
+            />
+            <QuotaCard 
+              title="高清有码" 
+              current={quotaHD.current} 
+              max={quotaHD.max} 
+              icon={Film}
+              colorClass="text-blue-500"
+              bgClass="bg-blue-50"
+            />
+            <QuotaCard 
+              title="外挂字幕" 
+              current={quotaSub.current} 
+              max={quotaSub.max} 
+              icon={FileText}
+              colorClass="text-rose-500"
+              bgClass="bg-rose-50"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
