@@ -10,6 +10,7 @@ export function Lab() {
   
   const [blacklist, setBlacklist] = useState<string[]>([]);
   const [newActorName, setNewActorName] = useState('');
+  const [history, setHistory] = useState<{time: string, msg: string, success: boolean}[]>([]);
   
   useEffect(() => {
     fetchBlacklist();
@@ -55,9 +56,11 @@ export function Lab() {
             actor: res.data.actor,
             cover: res.data.cover_url
         });
+        setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `[${res.data.code}] 识别成功: 演员 ${res.data.actor || '未知'}`, success: true }, ...prev].slice(0, 50));
     } catch (error: any) {
         console.error(error);
-        alert(error.response?.data?.detail || "刮削失败，请检查后端日志");
+        const errMsg = error.response?.data?.detail || "刮削失败，请检查后端日志";
+        setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `解析 ${filename} 失败: ${errMsg}`, success: false }, ...prev].slice(0, 50));
     } finally {
         setIsRecognizing(false);
     }
@@ -182,6 +185,26 @@ export function Lab() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 识别历史记录 */}
+        {history.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col flex-1 min-h-[200px] overflow-hidden">
+            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+              本次识别流水记录
+            </h3>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+              {history.map((h, i) => (
+                <div key={i} className={clsx(
+                  "px-3 py-2 rounded-lg text-sm border-l-4 font-medium flex gap-3",
+                  h.success ? "bg-slate-50 border-emerald-400 text-slate-600" : "bg-rose-50 border-rose-400 text-rose-700"
+                )}>
+                  <span className="text-slate-400 font-mono text-xs mt-0.5">{h.time}</span>
+                  <span>{h.msg}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
