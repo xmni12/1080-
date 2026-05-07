@@ -14,6 +14,25 @@ class TaskManager:
     def __init__(self):
         self.active_spiders: dict[str, DiscuzSpiderService] = {}
         self.active_pages: dict[str, ChromiumPage] = {}
+        self.task_queue = asyncio.Queue()
+        self.worker_task = None
+        self.queued_sections = set()
+
+    async def start_worker(self):
+        if self.worker_task is None:
+            self.worker_task = asyncio.create_task(self._queue_worker())
+
+    async def _queue_worker(self):
+        while True:
+            section_key = await self.task_queue.get()
+            try:
+                await self._execute_discuz_spider(section_key)
+            except Exception as e:
+                logger.error(f"Worker execution error: {e}")
+            finally:
+                if section_key in self.queued_sections:
+                    self.queued_sections.remove(section_key)
+                self.task_queue.task_done()
 
     def stop_spider(self, section_key: str = None):
         """
@@ -45,6 +64,24 @@ class TaskManager:
         await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
     async def run_discuz_spider(self, section_key: str):
+        """
+        将爬虫任务加入队列
+        """
+        if section_key in self.queued_sections or section_key in self.active_spiders:
+            await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务已在队列或运行中，请勿重复投递。", "level": "error"})
+            return
+            
+        self.queued_sections.add(section_key)
+        await self.task_queue.put(section_key)
+        
+        queue_pos = self.task_queue.qsize()
+        if queue_pos == 1 and not self.active_spiders:
+            pass # It will start immediately, no need to say queueing
+        else:
+            msg = f"📝 [{section_key}] 任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
+            await manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
+
+    async def _execute_discuz_spider(self, section_key: str):
         """
         运行真实的 Discuz 爬虫任务
         """

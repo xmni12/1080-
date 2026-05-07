@@ -117,6 +117,30 @@ export function Settings() {
                 启用人类行为模拟 (防封控机制)
               </label>
             </div>
+            <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2 border-t border-slate-100">
+              <input 
+                type="checkbox" 
+                id={`timer_enabled_${section}`}
+                checked={config.sections[section]?.timer_enabled ?? false}
+                onChange={e => updateSection(section, 'timer_enabled', e.target.checked)}
+                className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-600"
+              />
+              <label htmlFor={`timer_enabled_${section}`} className="text-sm font-medium text-slate-700 cursor-pointer">
+                开启此版块的每日定时自动爬取任务
+              </label>
+              
+              {config.sections[section]?.timer_enabled && (
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-sm text-slate-500">定时启动时间:</span>
+                  <input 
+                    type="time" 
+                    value={config.sections[section]?.timer_time || "03:00"}
+                    onChange={e => updateSection(section, 'timer_time', e.target.value)}
+                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-sm"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ))}
