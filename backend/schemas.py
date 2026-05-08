@@ -58,6 +58,9 @@ class GlobalSettings(BaseModel):
 class RecognizeRequest(BaseModel):
     filename: str
 
+class RecognizeBatchRequest(BaseModel):
+    filenames: list[str]
+
 class RecognizeResponse(BaseModel):
     code: str
     actor: str

@@ -23,6 +23,21 @@ export function Lab() {
         const data = JSON.parse(event.data);
         if (data.type === 'lab_status') {
           setProbeStatus(data.message);
+          if (data.message.includes('全部处理完成')) {
+            setTimeout(() => setIsRecognizing(false), 2000);
+          }
+        } else if (data.type === 'lab_result') {
+            if (data.success) {
+                setResult({
+                    filename: data.filename,
+                    code: data.data.code,
+                    actor: data.data.actor,
+                    cover: data.data.cover_url
+                });
+                setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `[${data.data.code}] 识别成功: 演员 ${data.data.actor || '未知'}`, success: true }, ...prev].slice(0, 50));
+            } else {
+                setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `[${data.code}] 解析失败: ${data.error}`, success: false }, ...prev].slice(0, 50));
+            }
         }
       } catch (e) {
         // ignore non-json messages
@@ -52,35 +67,21 @@ export function Lab() {
     setIsDragging(false);
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      simulateRecognition(file.name);
-    }
-  };
-
-  const simulateRecognition = async (filename: string) => {
-    setIsRecognizing(true);
-    setResult(null);
-    
-    try {
-        const res = await axios.post('http://127.0.0.1:8000/api/lab/recognize', { filename });
-        setResult({
-            filename: filename,
-            code: res.data.code,
-            actor: res.data.actor,
-            cover: res.data.cover_url
-        });
-        setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `[${res.data.code}] 识别成功: 演员 ${res.data.actor || '未知'}`, success: true }, ...prev].slice(0, 50));
-    } catch (error: any) {
-        console.error(error);
-        const errMsg = error.response?.data?.detail || "刮削失败，请检查后端日志";
-        setHistory(prev => [{ time: new Date().toLocaleTimeString(), msg: `解析 ${filename} 失败: ${errMsg}`, success: false }, ...prev].slice(0, 50));
-    } finally {
-        setIsRecognizing(false);
+      const files = Array.from(e.dataTransfer.files).map(f => f.name);
+      setIsRecognizing(true);
+      setProbeStatus(`已接收 ${files.length} 个文件，准备加入批量队列...`);
+      try {
+          await axios.post('http://127.0.0.1:8000/api/lab/recognize_batch', { filenames: files });
+      } catch (error: any) {
+          console.error(error);
+          setIsRecognizing(false);
+          alert("批量任务投递失败");
+      }
     }
   };
 
