@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from backend.services.task_manager import task_manager
+from backend.routers.websocket import manager
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +12,10 @@ class AvbaseService:
         借用 task_manager 中的常驻隐身浏览器抓取 AVBase。
         使用独立的新标签页，抓完即焚。
         """
-        # 寻找可用的常驻浏览器 (例如 cf_clearance 或 其他版块活跃的 page)
-        # 如果没有，可能需要新开一个临时浏览器，但为了性能和伪装，最好借助已有的
-        
-        # 考虑到目前系统可能没在跑任务，如果没有浏览器，我们需要起一个伪无头的
+        async def push_status(msg: str):
+            await manager.broadcast_json({"type": "lab_status", "message": msg})
+            
+        # 寻找可用的常驻浏览器
         page = None
         for key in ['cf_clearance', 'login_auth', 'vr', '4k', 'hd', 'sub']:
             if key in task_manager.active_pages:
@@ -23,7 +24,7 @@ class AvbaseService:
                 
         is_temp_browser = False
         if not page:
-            # 临时启动一个伪无头浏览器
+            await push_status("🤖 正在唤醒底层隐身浏览器 (Temp Browser)...")
             logger.info("AvBase Scraper: No active browser found, starting a temp one...")
             from DrissionPage import ChromiumPage, ChromiumOptions
             import os
@@ -39,62 +40,76 @@ class AvbaseService:
             except Exception as e:
                 logger.error(f"Failed to start temp browser for AvBase: {e}")
                 return None
+        else:
+            await push_status("⚡ 成功借用常驻浏览器，准备进入暗网...")
 
         # 打开新标签页
         tab = page.new_tab()
         try:
             # 1. 搜索
-            search_url = f"https://avbase.net/search?q={code}"
+            search_url = f"https://www.avbase.net/works?q={code}"
+            await push_status(f"🌐 正在突破 avbase.net，执行深度检索...")
             logger.info(f"AvBase Scraper: Navigating to {search_url}")
             tab.get(search_url)
             await asyncio.sleep(2) # 等待加载和潜在的 CF 盾
             
             # 判断 CF
             if "Just a moment" in tab.title or "cf-turnstile" in tab.html:
+                await push_status("🛡️ 遭遇五秒 CF 盾！执行强制静默等待 (8秒)...")
                 logger.warning("AvBase Scraper: Encountered CF shield, waiting longer...")
                 await asyncio.sleep(8)
                 
-            html = tab.html
+            await push_status("✅ 破盾成功！正在解析 DOM 树提取档案数据...")
             
-            # 解析
-            # 如果搜索结果只有一条，AVBase 通常会直接跳转到详情页
-            # 判断是在搜索列表还是在详情页
+            # 检查是否还在列表页
+            # 如果 URL 中没有包含 "/works/" 或者 URL 中包含 "?q="，说明我们在搜索结果页
+            if "/works/" not in tab.url or "?q=" in tab.url:
+                # 寻找第一个匹配的详情页链接
+                detail_link = None
+                for a in tab.eles('tag:a'):
+                    href = a.attr('href') or ""
+                    if "/works/" in href and "?q=" not in href and "date/" not in href:
+                        detail_link = href
+                        break
+                
+                if detail_link:
+                    await push_status("🔎 发现详情页入口，正在潜入...")
+                    tab.get(detail_link if detail_link.startswith('http') else f"https://www.avbase.net{detail_link}")
+                    await asyncio.sleep(2)
+                else:
+                    logger.warning(f"AvBase Scraper: Could not find detail page link for {code}")
+                    return None
+
+            # 现在应该在详情页了
             actor = "未知演员"
             cover_url = ""
             
-            if "Video Details" in tab.title or "作品详情" in html or "Movie Details" in html or "影片详情" in html or code.upper() in tab.title.upper():
-                # 在详情页
-                img_tag = tab.ele('css:img.video-cover')
-                if img_tag:
-                    cover_url = img_tag.attr('src')
-                
-                # 找演员
-                # 简单用正则找女优名字的区域，或者直接用元素定位
-                actor_eles = tab.eles('css:a[href*="/star/"]')
-                if actor_eles:
-                    actor = " ".join([a.text for a in actor_eles if a.text])
-            else:
-                # 在列表页
-                card = tab.ele('.video-card')
-                if card:
-                    img = card.ele('tag:img')
-                    if img: cover_url = img.attr('src')
+            # 提取演员 (AVBase 的演员链接是以 /talents/ 开头)
+            actor_eles = tab.eles('css:a[href*="/talents/"]')
+            if actor_eles:
+                # 过滤掉空的，并且去重
+                actors = []
+                for a in actor_eles:
+                    text = a.text.strip()
+                    if text and text not in actors:
+                        actors.append(text)
+                if actors:
+                    actor = " ".join(actors)
                     
-                    # 尝试点进去拿演员
-                    detail_link = card.ele('tag:a')
-                    if detail_link:
-                        href = detail_link.attr('href')
-                        tab.get(href)
-                        await asyncio.sleep(1)
-                        actor_eles = tab.eles('css:a[href*="/star/"]')
-                        if actor_eles:
-                            actor = " ".join([a.text for a in actor_eles if a.text])
+            # 提取封面 (通常包含 max-w-full 或 img-fallback class)
+            img_eles = tab.eles('tag:img')
+            for img in img_eles:
+                cls = img.attr('class') or ""
+                src = img.attr('src') or ""
+                if "max-w-full" in cls or "pl.jpg" in src or "ps.jpg" in src:
+                    cover_url = src
+                    break
 
             if cover_url and cover_url.startswith('/'):
-                cover_url = "https://avbase.net" + cover_url
+                cover_url = "https://www.avbase.net" + cover_url
 
-            if not cover_url:
-                logger.warning(f"AvBase Scraper: Could not find data for {code}")
+            if not cover_url and actor == "未知演员":
+                logger.warning(f"AvBase Scraper: Could not find any valid data on detail page for {code}")
                 return None
 
             return {
