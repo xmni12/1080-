@@ -12,13 +12,13 @@ router = APIRouter(prefix="/api/records", tags=["records"])
 
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
-    # 获取各个版块的总量和今日新增
+    # 获取各个版块的总量和今日新增（排除手动录入）
     today_start = datetime.combine(date.today(), time.min)
     
     stmt = select(
         DownloadRecord.section,
         func.count(DownloadRecord.id).label('total'),
-        func.sum(case((DownloadRecord.download_time >= today_start, 1), else_=0)).label('today')
+        func.sum(case(((DownloadRecord.download_time >= today_start) & (DownloadRecord.title != '[手动录入]'), 1), else_=0)).label('today')
     ).group_by(DownloadRecord.section)
     
     result = await db.execute(stmt)

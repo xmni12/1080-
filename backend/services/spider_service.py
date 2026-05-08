@@ -146,6 +146,7 @@ class DiscuzSpiderService:
                     db_lock = asyncio.Lock()
 
                     async def process_task(task_obj):
+                        nonlocal downloaded_count
                         if self.stop_requested: return
                         code = task_obj['code']
                         title = task_obj['title']
@@ -179,13 +180,17 @@ class DiscuzSpiderService:
                         
                         async with sem:
                             if self.stop_requested: return
+                            if downloaded_count >= limit:
+                                self._log("！！！已达到每日下载配额，正在停止当前批次任务！！！")
+                                self.stop_requested = True
+                                return
+                                
                             self._log(f"[并发线程] 正在处理: {code}")
                             
                             result = await self._download_attachments(post_url, code, save_path, config)
                             
                             if result == "SUCCESS":
                                 async with db_lock:
-                                    nonlocal downloaded_count
                                     downloaded_count += 1
                                     downloaded_codes.add(code)
                                     await self.save_record(session, section_key, code, title, post_url)
@@ -276,6 +281,10 @@ class DiscuzSpiderService:
                         
                         dl_resp = await client.get(download_url, follow_redirects=True)
                         if dl_resp.status_code == 200:
+                            # 校验是否超配额 (以二进制方式查找关键字)
+                            if any(kw in dl_resp.content for kw in [b"\xe5\xb7\xb2\xe8\xb6\x85\xe5\x87\xba", b"\xe7\xb8\xbd\xe8\xa8\x88", b"\xe6\x9d\x83\xe9\x99\x90", b"\xe6\xac\xa1\xe6\x95\xb0\xe5\xb7\xb2\xe6\xbb\xa1"]): # UTF-8 编码的 "已超出", "總計", "权限", "次数已满"
+                                return "QUOTA_LIMIT"
+
                             content_head = dl_resp.content[:50]
                             ext = ""
                             
