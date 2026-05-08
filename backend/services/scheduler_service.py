@@ -31,8 +31,8 @@ class SchedulerService:
                     
                     # 包装异步方法
                     async def run_job(sk=section_key):
-                        logger.info(f"Cron triggered for {sk}")
-                        await task_manager.run_discuz_spider(sk)
+                        logger.info(f"Cron triggered for {sk} (mode: new)")
+                        await task_manager.run_discuz_spider(sk, mode="new")
                         
                     self.scheduler.add_job(
                         run_job, 

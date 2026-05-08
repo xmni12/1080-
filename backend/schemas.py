@@ -29,6 +29,7 @@ class DeleteRequest(BaseModel):
 
 class TaskRequest(BaseModel):
     section: str
+    mode: str = "new" # new or archive
 
 class RenameRequest(BaseModel):
     files: list[str]

@@ -63,7 +63,7 @@ class TaskManager:
         logger.info(log_msg)
         await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
-    async def run_discuz_spider(self, section_key: str):
+    async def run_discuz_spider(self, section_key: str, mode: str = "new"):
         """
         将爬虫任务加入队列
         """
@@ -72,16 +72,17 @@ class TaskManager:
             return
             
         self.queued_sections.add(section_key)
-        await self.task_queue.put(section_key)
+        await self.task_queue.put((section_key, mode))
         
         queue_pos = self.task_queue.qsize()
         if queue_pos == 1 and not self.active_spiders:
             pass # It will start immediately, no need to say queueing
         else:
-            msg = f"📝 [{section_key}] 任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
+            mode_name = "极速追新" if mode == "new" else "深度考古"
+            msg = f"📝 [{section_key}] ({mode_name}) 任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
             await manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
 
-    async def _execute_discuz_spider(self, section_key: str):
+    async def _execute_discuz_spider(self, section_key: str, mode: str):
         """
         运行真实的 Discuz 爬虫任务
         """
@@ -146,7 +147,7 @@ class TaskManager:
             async with AsyncSessionLocal() as session:
                 spider = DiscuzSpiderService(page=page, log_callback=ws_log)
                 self.active_spiders[section_key] = spider
-                await spider.run_task(session, section_config, section_key)
+                await spider.run_task(session, section_config, section_key, mode)
         except Exception as e:
             ws_log(f"❌ 爬虫执行出现致命异常: {str(e)}")
         finally:

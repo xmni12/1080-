@@ -10,8 +10,8 @@ async def trigger_spider(request: TaskRequest, background_tasks: BackgroundTasks
     """
     触发后台爬虫任务
     """
-    background_tasks.add_task(task_manager.run_discuz_spider, request.section)
-    return {"status": "started", "section": request.section}
+    background_tasks.add_task(task_manager.run_discuz_spider, request.section, request.mode)
+    return {"status": "started", "section": request.section, "mode": request.mode}
 
 @router.post("/stop")
 async def stop_spider(request: TaskRequest = None):

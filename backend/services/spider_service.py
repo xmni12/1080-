@@ -72,7 +72,7 @@ class DiscuzSpiderService:
             session.add(record)
         await session.commit()
 
-    async def run_task(self, session: AsyncSession, config: Dict[str, Any], section_key: str):
+    async def run_task(self, session: AsyncSession, config: Dict[str, Any], section_key: str, mode: str = "new"):
         if not self.page:
             self._log("错误：未初始化浏览器页面实例。")
             return
@@ -82,7 +82,12 @@ class DiscuzSpiderService:
             downloaded_count = 0
             limit = config.get('daily_limit')
             if limit is None: limit = 55
-            start_page = int(config.get('start_page', 1))
+            
+            if mode == "new":
+                start_page = 1
+            else:
+                start_page = int(config.get('history_page', 1))
+                
             save_path = config.get('save_path', './downloads')
             section_url = config.get('url')
             
@@ -95,6 +100,8 @@ class DiscuzSpiderService:
             downloaded_codes = set(result.scalars().all())
             
             page_num = start_page
+            collision_count = 0
+            
             while not self.stop_requested and downloaded_count < limit:
                 self._log(f"--- 正在解析第 {page_num} 页 ---")
                 await self._human_delay(config, 1.0, 3.0)
@@ -147,6 +154,7 @@ class DiscuzSpiderService:
 
                     async def process_task(task_obj):
                         nonlocal downloaded_count
+                        nonlocal collision_count
                         if self.stop_requested: return
                         code = task_obj['code']
                         title = task_obj['title']
@@ -176,7 +184,18 @@ class DiscuzSpiderService:
                                 if is_global_exists:
                                     skip_download = True
                         
-                        if skip_download: return
+                        if skip_download:
+                            if mode == "new":
+                                async with db_lock:
+                                    collision_count += 1
+                                    if collision_count >= 20 and not self.stop_requested:
+                                        self._log("⚡ [智能刹车] 连续撞见 20 个已收录老番号，极速追新完成！")
+                                        self.stop_requested = True
+                            return
+                        else:
+                            if mode == "new":
+                                async with db_lock:
+                                    collision_count = 0
                         
                         async with sem:
                             if self.stop_requested: return
@@ -220,6 +239,19 @@ class DiscuzSpiderService:
                     page_num += 1
                 else:
                     break
+            
+            # 任务结束，如果是 archive 模式，保存高水位线
+            if mode == "archive":
+                current_history = int(config.get('history_page', 1))
+                if page_num > current_history:
+                    from core.utils import save_config, load_config
+                    full_config = load_config()
+                    if "sections" not in full_config: full_config["sections"] = {}
+                    if section_key not in full_config["sections"]: full_config["sections"][section_key] = {}
+                    full_config["sections"][section_key]["history_page"] = str(page_num)
+                    save_config(full_config)
+                    self._log(f"⛏️ 深度考古完成，历史最高水位线已更新至第 {page_num} 页。")
+
             self._log(f"任务结束。")
         except Exception as e:
             self._log(f"崩溃: {e}")

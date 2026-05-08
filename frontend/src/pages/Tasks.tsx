@@ -1,14 +1,15 @@
-import { Play, SquareSquare, StopCircle, ShieldCheck, KeyRound } from 'lucide-react';
+import { Play, SquareSquare, StopCircle, ShieldCheck, KeyRound, Zap, Pickaxe } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
 import { LogConsole } from '../components/LogConsole';
 import axios from 'axios';
+import { clsx } from 'clsx';
 
 export function Tasks() {
   const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/logs');
 
-  const startSpider = async (section: string) => {
+  const startSpider = async (section: string, mode: 'new' | 'archive' = 'new') => {
     try {
-      await axios.post('http://127.0.0.1:8000/api/tasks/spider', { section });
+      await axios.post('http://127.0.0.1:8000/api/tasks/spider', { section, mode });
     } catch (error) {
       console.error('Failed to start spider:', error);
     }
@@ -37,6 +38,28 @@ export function Tasks() {
       console.error('Failed to trigger authorize login:', error);
     }
   };
+
+  const renderSectionButtons = (title: string, section: string, color: string, hoverColor: string) => (
+    <div className={`flex flex-col gap-2 p-4 rounded-xl border border-${color}-100 bg-${color}-50/30`}>
+      <h4 className={`text-sm font-bold text-${color}-700 text-center mb-1 uppercase tracking-wider`}>{title} 版块</h4>
+      <div className="flex gap-2">
+        <button 
+          onClick={() => startSpider(section, 'new')}
+          className={clsx(`flex-1 flex items-center justify-center gap-1.5 bg-${color}-500 hover:bg-${color}-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
+          title="从第 1 页开始抓取，遇到连续旧贴自动刹车"
+        >
+          <Zap className="w-4 h-4" /> 极速追新
+        </button>
+        <button 
+          onClick={() => startSpider(section, 'archive')}
+          className={clsx(`flex-1 flex items-center justify-center gap-1.5 bg-${color}-600 hover:bg-${color}-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
+          title="从历史最大页码开始深度补漏"
+        >
+          <Pickaxe className="w-4 h-4" /> 深度考古
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -68,34 +91,14 @@ export function Tasks() {
           </div>
         </div>
         <p className="text-slate-500 mb-6 text-sm">
-          在此处手动触发后台爬虫任务。如果被拦截，请先点击获取绿卡以穿透防封控系统。若论坛需要账号，请点击账号登录进行授权。
+          在此处手动触发后台爬虫任务。<b>极速追新</b>：从第 1 页开始，连续遇到 20 个老番号自动停止；<b>深度考古</b>：从设置中的历史页码开始抓取老帖，结束时自动保存最大页码。
         </p>
 
-        <div className="flex flex-wrap gap-4">
-          <button 
-            onClick={() => startSpider('4k')}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            <Play className="w-4 h-4" /> 启动 4K 爬取
-          </button>
-          <button 
-            onClick={() => startSpider('vr')}
-            className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            <Play className="w-4 h-4" /> 启动 VR 爬取
-          </button>
-          <button 
-            onClick={() => startSpider('hd')}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            <Play className="w-4 h-4" /> 启动 HD 爬取
-          </button>
-          <button 
-            onClick={() => startSpider('sub')}
-            className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            <Play className="w-4 h-4" /> 启动字幕爬取
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {renderSectionButtons('4K 超清', '4k', 'emerald', 'emerald')}
+          {renderSectionButtons('VR 视频', 'vr', 'cyan', 'cyan')}
+          {renderSectionButtons('HD 高清', 'hd', 'blue', 'blue')}
+          {renderSectionButtons('外挂字幕', 'sub', 'rose', 'rose')}
         </div>
       </div>
 
