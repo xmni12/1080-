@@ -11,9 +11,27 @@ export function Lab() {
   const [blacklist, setBlacklist] = useState<string[]>([]);
   const [newActorName, setNewActorName] = useState('');
   const [history, setHistory] = useState<{time: string, msg: string, success: boolean}[]>([]);
+  const [probeStatus, setProbeStatus] = useState("正在初始化神经网络探测器...");
   
   useEffect(() => {
     fetchBlacklist();
+    
+    // 连接 WebSocket 接收实时状态
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws/logs');
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'lab_status') {
+          setProbeStatus(data.message);
+        }
+      } catch (e) {
+        // ignore non-json messages
+      }
+    };
+    
+    return () => {
+      ws.close();
+    };
   }, []);
 
   const fetchBlacklist = async () => {
@@ -106,10 +124,19 @@ export function Lab() {
           )}
         >
           {isRecognizing ? (
-            <div className="flex flex-col items-center text-primary">
-               <Search className="w-10 h-10 animate-bounce mb-3" />
-               <p className="font-semibold text-lg">正在联网 AVBase 深度刮削中...</p>
-               <p className="text-sm opacity-80 mt-1">突破 CF 盾，提取番号与演员数据</p>
+            <div className="flex flex-col items-center text-primary w-full px-8">
+               <Search className="w-10 h-10 animate-bounce mb-4" />
+               <p className="font-bold text-xl tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-500">
+                  正在深度刮削中...
+               </p>
+               <div className="mt-4 w-full max-w-md bg-slate-900 rounded-lg p-3 border border-slate-800 shadow-inner relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-primary animate-pulse"></div>
+                  <p className="text-emerald-400 font-mono text-sm break-all">
+                     <span className="text-slate-500 mr-2">{'>'}</span> 
+                     {probeStatus}
+                     <span className="animate-pulse ml-1 inline-block w-1.5 h-3.5 bg-emerald-400 align-middle"></span>
+                  </p>
+               </div>
             </div>
           ) : (
             <>
