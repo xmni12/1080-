@@ -24,13 +24,19 @@ class TaskManager:
 
     async def _queue_worker(self):
         while True:
-            section_key = await self.task_queue.get()
+            task_item = await self.task_queue.get()
+            section_key = None
             try:
-                await self._execute_discuz_spider(section_key)
+                if isinstance(task_item, tuple):
+                    section_key, mode = task_item
+                else:
+                    section_key = task_item
+                    mode = "new"
+                await self._execute_discuz_spider(section_key, mode)
             except Exception as e:
                 logger.error(f"Worker execution error: {e}")
             finally:
-                if section_key in self.queued_sections:
+                if section_key and section_key in self.queued_sections:
                     self.queued_sections.remove(section_key)
                 self.task_queue.task_done()
 
