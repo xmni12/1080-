@@ -1,4 +1,5 @@
-import { useState, useEffect, DragEvent } from 'react';
+import { useState, useEffect } from 'react';
+import type { DragEvent } from 'react';
 import { UploadCloud, Image as ImageIcon, Search, ShieldAlert, Trash2, Plus, AlertCircle, FileVideo } from 'lucide-react';
 import { clsx } from 'clsx';
 import axios from 'axios';

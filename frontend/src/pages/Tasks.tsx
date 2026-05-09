@@ -1,4 +1,4 @@
-import { Play, SquareSquare, StopCircle, ShieldCheck, KeyRound, Zap, Pickaxe } from 'lucide-react';
+import { SquareSquare, StopCircle, ShieldCheck, KeyRound, Zap, Pickaxe } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
 import { LogConsole } from '../components/LogConsole';
 import axios from 'axios';
@@ -39,27 +39,56 @@ export function Tasks() {
     }
   };
 
-  const renderSectionButtons = (title: string, section: string, color: string, hoverColor: string) => (
-    <div className={`flex flex-col gap-2 p-4 rounded-xl border border-${color}-100 bg-${color}-50/30`}>
-      <h4 className={`text-sm font-bold text-${color}-700 text-center mb-1 uppercase tracking-wider`}>{title} 版块</h4>
+  const colorMap: Record<string, any> = {
+    emerald: {
+      wrapper: "border-emerald-100 bg-emerald-50/30",
+      title: "text-emerald-700",
+      btn1: "bg-emerald-500 hover:bg-emerald-600",
+      btn2: "bg-emerald-600 hover:bg-emerald-700"
+    },
+    cyan: {
+      wrapper: "border-cyan-100 bg-cyan-50/30",
+      title: "text-cyan-700",
+      btn1: "bg-cyan-500 hover:bg-cyan-600",
+      btn2: "bg-cyan-600 hover:bg-cyan-700"
+    },
+    blue: {
+      wrapper: "border-blue-100 bg-blue-50/30",
+      title: "text-blue-700",
+      btn1: "bg-blue-500 hover:bg-blue-600",
+      btn2: "bg-blue-600 hover:bg-blue-700"
+    },
+    rose: {
+      wrapper: "border-rose-100 bg-rose-50/30",
+      title: "text-rose-700",
+      btn1: "bg-rose-500 hover:bg-rose-600",
+      btn2: "bg-rose-600 hover:bg-rose-700"
+    }
+  };
+
+  const renderSectionButtons = (title: string, section: string, color: string) => {
+    const theme = colorMap[color] || colorMap.blue;
+    return (
+    <div className={`flex flex-col gap-2 p-4 rounded-xl border ${theme.wrapper}`}>
+      <h4 className={`text-sm font-bold ${theme.title} text-center mb-1 uppercase tracking-wider`}>{title} 版块</h4>
       <div className="flex gap-2">
         <button 
           onClick={() => startSpider(section, 'new')}
-          className={clsx(`flex-1 flex items-center justify-center gap-1.5 bg-${color}-500 hover:bg-${color}-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
+          className={clsx(`flex-1 flex items-center justify-center gap-1.5 ${theme.btn1} text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
           title="从第 1 页开始抓取，遇到连续旧贴自动刹车"
         >
           <Zap className="w-4 h-4" /> 极速追新
         </button>
         <button 
           onClick={() => startSpider(section, 'archive')}
-          className={clsx(`flex-1 flex items-center justify-center gap-1.5 bg-${color}-600 hover:bg-${color}-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
+          className={clsx(`flex-1 flex items-center justify-center gap-1.5 ${theme.btn2} text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm`)}
           title="从历史最大页码开始深度补漏"
         >
           <Pickaxe className="w-4 h-4" /> 深度考古
         </button>
       </div>
     </div>
-  );
+  )};
 
   return (
     <div className="space-y-6">
@@ -95,10 +124,10 @@ export function Tasks() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {renderSectionButtons('4K 超清', '4k', 'emerald', 'emerald')}
-          {renderSectionButtons('VR 视频', 'vr', 'cyan', 'cyan')}
-          {renderSectionButtons('HD 高清', 'hd', 'blue', 'blue')}
-          {renderSectionButtons('外挂字幕', 'sub', 'rose', 'rose')}
+          {renderSectionButtons('4K 超清', '4k', 'emerald')}
+          {renderSectionButtons('VR 视频', 'vr', 'cyan')}
+          {renderSectionButtons('HD 高清', 'hd', 'blue')}
+          {renderSectionButtons('外挂字幕', 'sub', 'rose')}
         </div>
       </div>
 

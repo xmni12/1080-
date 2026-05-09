@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Database as DatabaseIcon, DownloadCloud, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 
@@ -129,7 +129,7 @@ export function Database() {
 
   const totalPages = Math.ceil(totalRecords / pageSize);
 
-  const StatCard = ({ title, sectionKey, icon: Icon, colorClass, bgClass }) => {
+  const StatCard = ({ title, sectionKey, icon: Icon, colorClass, bgClass }: { title: string, sectionKey: string, icon: any, colorClass: string, bgClass: string }) => {
     const data = stats?.[sectionKey] || { total: 0, today: 0 };
     const isActive = filterSection === sectionKey;
     
