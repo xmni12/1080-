@@ -37,6 +37,38 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
             
     return stats
 
+@router.get("/trend")
+async def get_trend(db: AsyncSession = Depends(get_db)):
+    # 获取最近7天的每日抓取量
+    from datetime import timedelta
+    seven_days_ago = date.today() - timedelta(days=6)
+    
+    stmt = select(
+        func.date(DownloadRecord.download_time).label('date'),
+        func.count(DownloadRecord.id).label('count')
+    ).where(
+        DownloadRecord.download_time >= datetime.combine(seven_days_ago, time.min),
+        DownloadRecord.title != '[手动录入]'
+    ).group_by(
+        func.date(DownloadRecord.download_time)
+    ).order_by(
+        func.date(DownloadRecord.download_time).asc()
+    )
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    trend_map = {row[0]: row[1] for row in rows}
+    final_data = []
+    for i in range(7):
+        d = seven_days_ago + timedelta(days=i)
+        curr_date_str = d.isoformat()
+        final_data.append({
+            "name": d.strftime('%m-%d'),
+            "count": trend_map.get(curr_date_str, 0)
+        })
+    return final_data
+
 @router.get("/", response_model=PaginatedRecordResponse)
 async def get_records(
     section: Optional[str] = None,

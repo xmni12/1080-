@@ -1,23 +1,27 @@
 import { useState, useEffect } from 'react';
 import { MonitorPlay, Film, Tv, FileText, Activity, Loader2 } from 'lucide-react';
 import { QuotaCard } from '../components/QuotaCard';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
 
 export function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
+  const [trendData, setTrendData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [statsRes, settingsRes] = await Promise.all([
+        const [statsRes, settingsRes, trendRes] = await Promise.all([
           axios.get('http://127.0.0.1:8000/api/records/stats'),
-          axios.get('http://127.0.0.1:8000/api/settings')
+          axios.get('http://127.0.0.1:8000/api/settings'),
+          axios.get('http://127.0.0.1:8000/api/records/trend')
         ]);
         setStats(statsRes.data);
         setSettings(settingsRes.data);
+        setTrendData(trendRes.data);
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
@@ -86,15 +90,55 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
          <div className="xl:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                  <Activity className="w-5 h-5 text-primary" />
-                 系统状态趋势
+                 系统状态趋势 (最近 7 日抓取量)
               </h3>
             </div>
-            <div className="h-64 flex items-center justify-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400">
-               {/* 这里后续可以集成 Recharts 展示图表 */}
-               图表数据采集中...
+            <div className="h-64 w-full">
+              {isLoading ? (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                   加载图表中...
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#94a3b8' }} 
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#94a3b8' }} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      cursor={{ stroke: '#3b82f6', strokeWidth: 2 }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="count" 
+                      name="下载量"
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorCount)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
          </div>
          
