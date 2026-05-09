@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, PlusCircle, Loader2, Trash2, LayoutGrid, MonitorPlay, Film, Languages, ListFilter, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 
@@ -21,6 +21,7 @@ export function Database() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCopying, setIsCopying] = useState(false);
   
   // 筛选与分页状态
   const [filterSection, setFilterSection] = useState('all');
@@ -71,6 +72,30 @@ export function Database() {
       console.error('Failed to fetch data', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCopyAllCodes = async () => {
+    try {
+      setIsCopying(true);
+      // 这里的逻辑是获取当前筛选条件下的【全量】番号，而不仅仅是当前页
+      const res = await axios.get(`http://127.0.0.1:8000/api/records/`, { 
+        params: { 
+          section: filterSection,
+          search: search,
+          page: 1,
+          page_size: 10000 
+        } 
+      });
+      
+      const allCodes = res.data.items.map((r: Record) => r.code).join('\n');
+      await navigator.clipboard.writeText(allCodes);
+      alert(`已成功复制该版块下共 ${res.data.items.length} 个番号到剪贴板！`);
+    } catch (error) {
+      console.error('Failed to copy codes', error);
+      alert('复制失败，请重试');
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -243,14 +268,26 @@ export function Database() {
               </div>
             </div>
 
-            <button 
-              onClick={handleBulkDelete}
-              disabled={selectedIds.size === 0 || isDeleting}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
-            >
-              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-              删除 ({selectedIds.size})
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleCopyAllCodes}
+                disabled={totalRecords === 0 || isCopying}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-indigo-100"
+                title="一键提取并复制当前筛选结果下的所有番号"
+              >
+                {isCopying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                批量提取
+              </button>
+
+              <button 
+                onClick={handleBulkDelete}
+                disabled={selectedIds.size === 0 || isDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                删除 ({selectedIds.size})
+              </button>
+            </div>
           </div>
 
           {/* 表格主体 */}

@@ -85,8 +85,13 @@ class DiscuzSpiderService:
             
             if mode == "new":
                 start_page = 1
+                # 极速追新模式：扫描深度从设置中读取，默认10页
+                max_depth = int(config.get('quick_scan_depth', 10))
+                end_page = max_depth
+                self._log(f"🚀 极速追新模式启动：将固定扫描前 {max_depth} 页内容。")
             else:
                 start_page = int(config.get('history_page', 1))
+                end_page = 9999 # 考古模式无深度限制，直到配额满或见底
                 
             save_path = config.get('save_path', './downloads')
             section_url = config.get('url')
@@ -100,9 +105,8 @@ class DiscuzSpiderService:
             downloaded_codes = set(result.scalars().all())
             
             page_num = start_page
-            collision_count = 0
             
-            while not self.stop_requested and downloaded_count < limit:
+            while not self.stop_requested and downloaded_count < limit and page_num <= end_page:
                 self._log(f"--- 正在解析第 {page_num} 页 ---")
                 await self._human_delay(config, 1.0, 3.0)
                 self.page.get(f"{section_url}&page={page_num}")
@@ -154,7 +158,6 @@ class DiscuzSpiderService:
 
                     async def process_task(task_obj):
                         nonlocal downloaded_count
-                        nonlocal collision_count
                         if self.stop_requested: return
                         code = task_obj['code']
                         title = task_obj['title']
@@ -185,17 +188,7 @@ class DiscuzSpiderService:
                                     skip_download = True
                         
                         if skip_download:
-                            if mode == "new":
-                                async with db_lock:
-                                    collision_count += 1
-                                    if collision_count >= 20 and not self.stop_requested:
-                                        self._log("⚡ [智能刹车] 连续撞见 20 个已收录老番号，极速追新完成！")
-                                        self.stop_requested = True
                             return
-                        else:
-                            if mode == "new":
-                                async with db_lock:
-                                    collision_count = 0
                         
                         async with sem:
                             if self.stop_requested: return
