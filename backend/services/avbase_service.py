@@ -68,7 +68,7 @@ class AvbaseService:
                 detail_link = None
                 for a in tab.eles('tag:a'):
                     href = a.attr('href') or ""
-                    if "/works/" in href and "?q=" not in href and "date/" not in href:
+                    if "/works/" in href and "?q=" not in href and "/date" not in href:
                         detail_link = href
                         break
                 
