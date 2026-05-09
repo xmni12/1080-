@@ -86,10 +86,16 @@ async def recognize_file(request: RecognizeRequest, db: AsyncSession = Depends(g
     )
 
 async def _process_batch(filenames: List[str]):
+    from backend.services.task_manager import task_manager
+    task_manager.stop_lab_requested = False
     total = len(filenames)
     await manager.broadcast_json({"type": "lab_status", "message": f"📦 收到 {total} 个文件的批量识别请求，加入处理队列..."})
     
     for idx, filename in enumerate(filenames):
+        if task_manager.stop_lab_requested:
+            await manager.broadcast_json({"type": "lab_status", "message": f"🛑 批量识别任务已被用户强制终止！"})
+            break
+            
         await asyncio.sleep(1)
         code = extract_code(filename)
         if not code:

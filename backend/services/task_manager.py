@@ -17,6 +17,7 @@ class TaskManager:
         self.task_queue = asyncio.Queue()
         self.worker_task = None
         self.queued_sections = set()
+        self.stop_lab_requested = False
 
     async def start_worker(self):
         if self.worker_task is None:
@@ -52,6 +53,7 @@ class TaskManager:
             for key, spider in self.active_spiders.items():
                 spider.stop_requested = True
                 logger.info(f"Requested stop for spider: {key}")
+            self.stop_lab_requested = True
             return {"status": "stopping_all"}
         return {"status": "not_running"}
 
