@@ -6,12 +6,15 @@ import axios from 'axios';
 import { clsx } from 'clsx';
 
 export function Tasks() {
-  const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/logs');
   const [queueStatus, setQueueStatus] = useState<{ running: any[], queued: any[] }>({ running: [], queued: [] });
+  const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/logs', (data) => {
+    setQueueStatus(data);
+  });
 
   useEffect(() => {
     fetchQueueStatus();
-    const interval = setInterval(fetchQueueStatus, 2000);
+    // Optional: we can still poll as a fallback, but let's reduce frequency since WS handles it instantly
+    const interval = setInterval(fetchQueueStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 

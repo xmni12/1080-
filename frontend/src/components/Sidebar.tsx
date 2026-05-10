@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListTodo, FileEdit, Database, Settings, Link2 } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Database, Settings } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface SidebarProps {
@@ -9,8 +9,6 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
   { id: 'tasks', label: '任务中心', icon: ListTodo },
-  { id: 'rename', label: '智能重命名', icon: FileEdit },
-  { id: 'ed2k', label: 'ED2K提取', icon: Link2 },
   { id: 'database', label: '全局仓库', icon: Database },
   { id: 'settings', label: '系统设置', icon: Settings },
 ];

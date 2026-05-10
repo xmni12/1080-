@@ -21,6 +21,7 @@ class TaskManager:
         self._queue_event = asyncio.Event()
         self.worker_task = None
         self.stop_lab_requested = False
+        self.current_running_task = None
 
     async def start_worker(self):
         if self.worker_task is None:
@@ -48,13 +49,19 @@ class TaskManager:
                 
             section_key = task_item['section_key']
             mode = task_item['mode']
+            self.current_running_task = section_key
+            
+            # Broadcast queue update right after popping
+            await self.broadcast_queue_status()
             
             try:
                 await self._execute_discuz_spider(section_key, mode)
             except Exception as e:
                 logger.error(f"Worker execution error: {e}")
+            finally:
+                self.current_running_task = None
                 
-            # Broadcast queue update
+            # Broadcast queue update after completion
             await self.broadcast_queue_status()
 
     async def broadcast_queue_status(self):
@@ -66,8 +73,12 @@ class TaskManager:
             queued = list(self._queue_list)
         
         running = []
+        if self.current_running_task:
+            running.append({"section_key": self.current_running_task})
+            
         for sec in self.active_spiders.keys():
-            running.append({"section_key": sec})
+            if not any(r["section_key"] == sec for r in running):
+                running.append({"section_key": sec})
             
         return {"running": running, "queued": queued}
 
