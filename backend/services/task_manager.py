@@ -10,13 +10,16 @@ from core.utils import load_config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import time
+
 class TaskManager:
     def __init__(self):
         self.active_spiders: dict[str, DiscuzSpiderService] = {}
         self.active_pages: dict[str, ChromiumPage] = {}
-        self.task_queue = asyncio.Queue()
+        self._queue_list = []
+        self._queue_lock = asyncio.Lock()
+        self._queue_event = asyncio.Event()
         self.worker_task = None
-        self.queued_sections = set()
         self.stop_lab_requested = False
 
     async def start_worker(self):
@@ -25,21 +28,58 @@ class TaskManager:
 
     async def _queue_worker(self):
         while True:
-            task_item = await self.task_queue.get()
-            section_key = None
+            await self._queue_event.wait()
+            
+            task_item = None
+            async with self._queue_lock:
+                if not self._queue_list:
+                    self._queue_event.clear()
+                    continue
+                    
+                # Sort: is_vip DESC (True first), then timestamp ASC
+                self._queue_list.sort(key=lambda x: (not x['is_vip'], x['timestamp']))
+                task_item = self._queue_list.pop(0)
+                
+                if not self._queue_list:
+                    self._queue_event.clear()
+                    
+            if not task_item:
+                continue
+                
+            section_key = task_item['section_key']
+            mode = task_item['mode']
+            
             try:
-                if isinstance(task_item, tuple):
-                    section_key, mode = task_item
-                else:
-                    section_key = task_item
-                    mode = "new"
                 await self._execute_discuz_spider(section_key, mode)
             except Exception as e:
                 logger.error(f"Worker execution error: {e}")
-            finally:
-                if section_key and section_key in self.queued_sections:
-                    self.queued_sections.remove(section_key)
-                self.task_queue.task_done()
+                
+            # Broadcast queue update
+            await self.broadcast_queue_status()
+
+    async def broadcast_queue_status(self):
+        status = await self.get_queue_status()
+        await manager.broadcast_json({"type": "queue_update", "data": status})
+
+    async def get_queue_status(self):
+        async with self._queue_lock:
+            queued = list(self._queue_list)
+        
+        running = []
+        for sec in self.active_spiders.keys():
+            running.append({"section_key": sec})
+            
+        return {"running": running, "queued": queued}
+
+    async def remove_queued_task(self, section_key: str, mode: str):
+        async with self._queue_lock:
+            original_len = len(self._queue_list)
+            self._queue_list = [t for t in self._queue_list if not (t['section_key'] == section_key and t['mode'] == mode)]
+            removed = original_len > len(self._queue_list)
+            
+        if removed:
+            await self.broadcast_queue_status()
+        return removed
 
     def stop_spider(self, section_key: str = None):
         """
@@ -71,23 +111,42 @@ class TaskManager:
         logger.info(log_msg)
         await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
-    async def run_discuz_spider(self, section_key: str, mode: str = "new"):
+    async def run_discuz_spider(self, section_key: str, mode: str = "new", is_vip: bool = True):
         """
         将爬虫任务加入队列
         """
-        if section_key in self.queued_sections or section_key in self.active_spiders:
-            await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务已在队列或运行中，请勿重复投递。", "level": "error"})
-            return
-            
-        self.queued_sections.add(section_key)
-        await self.task_queue.put((section_key, mode))
+        async with self._queue_lock:
+            # Check if already in queue
+            for t in self._queue_list:
+                if t['section_key'] == section_key and t['mode'] == mode:
+                    await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 同模式任务已在队列中，请勿重复投递。", "level": "error"})
+                    return
+                    
+        if section_key in self.active_spiders:
+             await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务正在运行中，请勿重复投递。", "level": "error"})
+             return
+             
+        new_task = {
+            "section_key": section_key,
+            "mode": mode,
+            "is_vip": is_vip,
+            "timestamp": time.time()
+        }
         
-        queue_pos = self.task_queue.qsize()
+        async with self._queue_lock:
+            self._queue_list.append(new_task)
+            self._queue_list.sort(key=lambda x: (not x['is_vip'], x['timestamp']))
+            queue_pos = self._queue_list.index(new_task) + 1
+            self._queue_event.set()
+        
+        await self.broadcast_queue_status()
+        
         if queue_pos == 1 and not self.active_spiders:
             pass # It will start immediately, no need to say queueing
         else:
             mode_name = "极速追新" if mode == "new" else "深度考古"
-            msg = f"📝 [{section_key}] ({mode_name}) 任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
+            vip_mark = "⭐VIP " if is_vip else ""
+            msg = f"📝 [{section_key}] ({mode_name}) {vip_mark}任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
             await manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
 
     async def _execute_discuz_spider(self, section_key: str, mode: str):

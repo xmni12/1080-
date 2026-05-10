@@ -31,6 +31,10 @@ class TaskRequest(BaseModel):
     section: str
     mode: str = "new" # new or archive
 
+class QueueRemoveRequest(BaseModel):
+    section: str
+    mode: str
+
 class RenameRequest(BaseModel):
     files: list[str]
     rules: list[str]

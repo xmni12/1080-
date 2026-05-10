@@ -1,9 +1,24 @@
 from fastapi import APIRouter, BackgroundTasks
-from backend.schemas import TaskRequest, RenameRequest
+from backend.schemas import TaskRequest, RenameRequest, QueueRemoveRequest
 from backend.services.task_manager import task_manager
 from backend.services.rename_service import rename_service
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+
+@router.get("/queue")
+async def get_queue():
+    """
+    获取当前排队和运行中的任务状态
+    """
+    return await task_manager.get_queue_status()
+
+@router.post("/queue/remove")
+async def remove_queued_task(request: QueueRemoveRequest):
+    """
+    从队列中移除任务
+    """
+    removed = await task_manager.remove_queued_task(request.section, request.mode)
+    return {"status": "success", "removed": removed}
 
 @router.post("/spider")
 async def trigger_spider(request: TaskRequest, background_tasks: BackgroundTasks):
