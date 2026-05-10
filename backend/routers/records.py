@@ -74,7 +74,7 @@ async def get_records(
     section: Optional[str] = None,
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=1000),
+    page_size: int = Query(50, ge=1, le=100000),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(DownloadRecord)
