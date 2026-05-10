@@ -54,20 +54,3 @@ class GlobalSettings(BaseModel):
     hide_browser: bool = False
     rename_settings: RenameSettings
     spider_threads: int = 1
-
-class RecognizeRequest(BaseModel):
-    filename: str
-
-class RecognizeBatchRequest(BaseModel):
-    filenames: list[str]
-
-class RecognizeResponse(BaseModel):
-    code: str
-    actor: str
-    cover_url: str
-
-class BlacklistActorResponse(BaseModel):
-    name: str
-
-class AddBlacklistRequest(BaseModel):
-    name: str

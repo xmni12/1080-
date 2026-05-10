@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import records, tasks, websocket, settings, lab
+from backend.routers import records, tasks, websocket, settings
 from backend.database import engine, Base
 from backend.services.scheduler_service import scheduler_service
 from backend.services.task_manager import task_manager
@@ -27,7 +27,6 @@ app.include_router(records.router)
 app.include_router(tasks.router)
 app.include_router(websocket.router)
 app.include_router(settings.router)
-app.include_router(lab.router)
 
 @app.get("/")
 async def read_root():

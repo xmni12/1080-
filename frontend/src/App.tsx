@@ -3,7 +3,6 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Tasks } from './pages/Tasks';
 import { Rename } from './pages/Rename';
-import { Lab } from './pages/Lab';
 import { Ed2k } from './pages/Ed2k';
 import { Database } from './pages/Database';
 import { Settings } from './pages/Settings';
@@ -16,7 +15,6 @@ function App() {
       {currentTab === 'dashboard' && <Dashboard />}
       {currentTab === 'tasks' && <Tasks />}
       {currentTab === 'rename' && <Rename />}
-      {currentTab === 'lab' && <Lab />}
       {currentTab === 'ed2k' && <Ed2k />}
       {currentTab === 'database' && <Database />}
       {currentTab === 'settings' && <Settings />}

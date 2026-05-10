@@ -23,7 +23,6 @@ export function Layout({ children, currentTab, setCurrentTab }: LayoutProps) {
             {currentTab === 'dashboard' && '仪表盘 Dashboard'}
             {currentTab === 'tasks' && '任务中心 Tasks Center'}
             {currentTab === 'rename' && '智能重命名 Intelligent Rename'}
-            {currentTab === 'lab' && '智能工作台 Intelligent Lab'}
             {currentTab === 'ed2k' && 'ED2K提取 ED2K Extraction'}
             {currentTab === 'database' && '全局仓库 Database'}
             {currentTab === 'settings' && '系统设置 Settings'}
