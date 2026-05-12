@@ -48,13 +48,9 @@ class SectionSettings(BaseModel):
     timer_time: str = "03:00"
     simulate_human: bool = True
     daily_limit: Optional[int] = None
-
-class RenameSettings(BaseModel):
-    rules: str = ""
-    threads: str = "3"
+    quick_scan_depth: Optional[int] = 10
 
 class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
-    rename_settings: RenameSettings
     spider_threads: int = 1
