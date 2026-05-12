@@ -219,6 +219,7 @@ class DiscuzSpiderService:
                                 elif result.startswith("DL_HTTP_ERROR_"): err_msg = f"附件下载被拒绝 ({result})"
                                 elif result == "TIMEOUT": err_msg = "纯代码网络引擎请求超时，可能代理波动"
                                 elif result == "NO_VALID_DOWNLOAD": err_msg = "找到了附件链接，但所有的下载尝试均失败"
+                                elif result.startswith("ERR:"): err_msg = f"网络/解析异常 ({result[4:]})"
                                 else: err_msg = f"未知异常 ({result})"
                                 
                                 self._log(f"❌ [{code}] 失败跳过：{err_msg}")
@@ -350,9 +351,12 @@ class DiscuzSpiderService:
                 
         except httpx.TimeoutException:
             return "TIMEOUT"
+        except httpx.RequestError as e:
+            logger.error(f"HTTPX Request Error for {code}: {e}")
+            return f"ERR:{type(e).__name__}"
         except Exception as e:
             logger.error(f"HTTPX Detail Fetch failed for {code}: {e}")
-            return "UNKNOWN_ERROR"
+            return f"ERR:{type(e).__name__}"
 
     def stop(self):
         self.stop_requested = True
