@@ -14,10 +14,13 @@ export function useLogs(url: string, onQueueUpdate?: (data: any) => void) {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    let ws: WebSocket;
+    let ws: WebSocket | null = null;
+    let isCancelled = false;
     
     // 1. Fetch history first
     axios.get('http://127.0.0.1:8000/api/ws/history').then(res => {
+        if (isCancelled) return;
+        
         if (res.data && Array.isArray(res.data)) {
             const historyLogs: LogMessage[] = res.data
               .filter((item: any) => item.type !== 'queue_update' && item.type !== 'lab_status' && item.type !== 'lab_result')
@@ -67,10 +70,12 @@ export function useLogs(url: string, onQueueUpdate?: (data: any) => void) {
           }
         };
     }).catch(e => {
-        console.error("Failed to load history", e);
+        if (!isCancelled) console.error("Failed to load history", e);
     });
 
     return () => {
+      isCancelled = true;
+      if (ws) ws.close();
       if (wsRef.current) wsRef.current.close();
     };
   }, [url]);
