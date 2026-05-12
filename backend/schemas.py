@@ -41,8 +41,8 @@ class RenameRequest(BaseModel):
     threads: int = 3
 
 class SectionSettings(BaseModel):
-    start_page: str = "1"
-    history_page: str = "1"
+    start_page: int = 1
+    history_page: int = 1
     save_path: str = ""
     timer_enabled: bool = False
     timer_time: str = "03:00"
