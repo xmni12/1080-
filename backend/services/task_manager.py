@@ -346,11 +346,12 @@ class TaskManager:
                 if not getattr(self, 'active_pages', {}).get('login_auth'):
                     break # 任务被后端提前中止
                 try:
-                    # 尝试获取页面标题，如果抛出异常说明窗口已经被关闭
-                    _ = page.title
-                except Exception:
-                    ws_log("✅ 检测到授权浏览器窗口已关闭。所有的 Cookie 和登录状态已安全落盘并持久化！")
-                    break
+                    # 尝试获取标签页数量，如果抛出特定断开异常说明窗口已经被关闭
+                    _ = page.tabs_count
+                except Exception as e:
+                    if type(e).__name__ in ['PageDisconnectedError', 'BrowserConnectError', 'ContextLostError']:
+                        ws_log("✅ 检测到授权浏览器窗口已关闭。所有的 Cookie 和登录状态已安全落盘并持久化！")
+                        break
                 
         except Exception as e:
             ws_log(f"❌ 浏览器启动或访问异常: {e}")
@@ -401,11 +402,12 @@ class TaskManager:
                 if not getattr(self, 'active_pages', {}).get('sandbox'):
                     break # 任务被后端提前中止
                 try:
-                    # 尝试获取页面标题，如果抛出异常说明窗口已经被关闭
-                    _ = page.title
-                except Exception:
-                    ws_log("✅ 漫游结束，产生的高质量指纹和绿卡已安全封存！")
-                    break
+                    # 尝试获取标签页数量，如果抛出特定断开异常说明窗口已经被关闭
+                    _ = page.tabs_count
+                except Exception as e:
+                    if type(e).__name__ in ['PageDisconnectedError', 'BrowserConnectError', 'ContextLostError']:
+                        ws_log("✅ 漫游结束，产生的高质量指纹和绿卡已安全封存！")
+                        break
                 
         except Exception as e:
             ws_log(f"❌ 浏览器启动或访问异常: {e}")
