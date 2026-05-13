@@ -363,4 +363,59 @@ class TaskManager:
             except:
                 pass
 
+    async def sandbox_browser(self):
+        """
+        纯净沙盒模式：独立打开浏览器，仅前往主页，无限等待用户手动关闭，无任何强制操作和倒计时
+        """
+        def ws_log(msg: str):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = "info"
+                if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'sandbox' in self.active_pages:
+            ws_log("❌ 自由沙盒浏览器已经在运行中，请不要重复打开。")
+            return
+
+        ws_log("▶ 开始初始化零干预自由沙盒浏览器 (强制有头模式)...")
+        co = ChromiumOptions().set_local_port(9222)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            self.active_pages['sandbox'] = page
+            ws_log("✅ 浏览器已成功打开，正前往论坛首页。")
+            page.get("https://x999x.me/")
+            
+            ws_log("💡 【沙盒模式】：你可以随心所欲地浏览、过盾或挂机。后台不会做任何干预。")
+            ws_log("💡 结束漫游时，请【手动点击右上角 X 关闭浏览器窗口】，系统会自动保存指纹和绿卡。")
+            
+            # 无限循环检测浏览器是否被用户手动关闭
+            while True:
+                await asyncio.sleep(2)
+                if not getattr(self, 'active_pages', {}).get('sandbox'):
+                    break # 任务被后端提前中止
+                try:
+                    # 尝试获取页面标题，如果抛出异常说明窗口已经被关闭
+                    _ = page.title
+                except Exception:
+                    ws_log("✅ 漫游结束，产生的高质量指纹和绿卡已安全封存！")
+                    break
+                
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动或访问异常: {e}")
+        finally:
+            if 'sandbox' in self.active_pages:
+                del self.active_pages['sandbox']
+            try:
+                page.quit()
+                ws_log("⏹ 沙盒漫游任务彻底结束。")
+            except:
+                pass
+
 task_manager = TaskManager()

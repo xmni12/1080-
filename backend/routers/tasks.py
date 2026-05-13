@@ -51,3 +51,11 @@ async def trigger_authorize(background_tasks: BackgroundTasks):
     """
     background_tasks.add_task(task_manager.login_authorize)
     return {"status": "started"}
+
+@router.post("/sandbox")
+async def trigger_sandbox(background_tasks: BackgroundTasks):
+    """
+    触发独立的自由沙盒浏览器
+    """
+    background_tasks.add_task(task_manager.sandbox_browser)
+    return {"status": "started"}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SquareSquare, StopCircle, ShieldCheck, KeyRound, Zap, Pickaxe, ListOrdered, XCircle, Loader2 } from 'lucide-react';
+import { SquareSquare, StopCircle, ShieldCheck, KeyRound, Zap, Pickaxe, ListOrdered, XCircle, Loader2, Globe } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
 import { LogConsole } from '../components/LogConsole';
 import axios from 'axios';
@@ -70,6 +70,14 @@ export function Tasks() {
     }
   };
 
+  const openSandbox = async () => {
+    try {
+      await axios.post('http://127.0.0.1:8000/api/tasks/sandbox');
+    } catch (error) {
+      console.error('Failed to trigger sandbox browser:', error);
+    }
+  };
+
   const colorMap: Record<string, any> = {
     emerald: {
       wrapper: "border-emerald-100 bg-emerald-50/30",
@@ -129,7 +137,14 @@ export function Tasks() {
             <SquareSquare className="w-5 h-5 text-primary" />
             任务调度中心
           </h3>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <button 
+              onClick={openSandbox}
+              className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+              title="纯净沙盒模式：无时间限制、无干预，用于挂机养号或手动过盾"
+            >
+              <Globe className="w-4 h-4" /> 开启指纹浏览器漫游
+            </button>
             <button 
               onClick={authorizeLogin}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
