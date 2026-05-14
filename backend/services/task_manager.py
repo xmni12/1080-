@@ -168,15 +168,18 @@ class TaskManager:
             await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
             return
 
-        def ws_log(msg: str):
+        def ws_log(msg: str, explicit_level: str = None):
             logger.info(msg)
             try:
                 # 异步触发 WebSocket 推送，不阻塞同步的爬虫逻辑
                 loop = asyncio.get_running_loop()
-                level = "info"
-                if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
-                elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                elif "避让" in msg or "跳过" in msg: level = "warn"
+                if explicit_level:
+                    level = explicit_level
+                else:
+                    level = "info"
+                    if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                    elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                 
                 loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except Exception as e:
