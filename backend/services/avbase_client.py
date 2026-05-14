@@ -29,12 +29,13 @@ class AvbaseClient:
 
                 html_text = resp.text
                 
-                # 在 HTML 中寻找类似 <a href="https://avbase.net/talents/xxx">演员名</a> 的元素
-                pattern = r'<a\s+href="[^"]*/talents/[^"]*"\s*>([^<]+)</a>'
+                import urllib.parse
+                # 提取 /talents/ 后面的 URL 编码的演员名称，无视 A 标签内部复杂的嵌套结构
+                pattern = r'href=["\'][^"\']*/talents/([^"\']+)["\']'
                 matches = re.findall(pattern, html_text)
                 
-                # 简单去重并清理空白
-                actors = list(set([m.strip() for m in matches if m.strip()]))
+                # 解码、去重并清理空白
+                actors = list(set([urllib.parse.unquote(m).strip() for m in matches if m.strip()]))
                 
                 return actors
 
