@@ -37,8 +37,14 @@ async def get_blacklist(
 async def add_blacklist(request: AddBlacklistRequest, db: AsyncSession = Depends(get_db)):
     added = 0
     skipped = 0
-    names = [n.strip() for n in request.names.split('\n') if n.strip()]
-    for name in names:
+    # 利用 dict.fromkeys 进行前置去重并保留原始顺序
+    raw_names = [n.strip() for n in request.names.split('\n') if n.strip()]
+    unique_names = list(dict.fromkeys(raw_names))
+    
+    # 统计因为同一批次内自我重复而被拦截的数量
+    skipped += len(raw_names) - len(unique_names)
+    
+    for name in unique_names:
         stmt = select(BlacklistActor).where(BlacklistActor.name == name)
         result = await db.execute(stmt)
         if not result.scalar_one_or_none():

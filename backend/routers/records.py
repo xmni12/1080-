@@ -102,8 +102,13 @@ async def get_records(
 async def add_manual_records(request: ManualEntryRequest, db: AsyncSession = Depends(get_db)):
     added = 0
     skipped = 0
-    codes = [c.strip().upper() for c in request.codes.split('\n') if c.strip()]
-    for code in codes:
+    raw_codes = [c.strip().upper() for c in request.codes.split('\n') if c.strip()]
+    unique_codes = list(dict.fromkeys(raw_codes))
+    
+    # 统计批次内自我重复被拦截的数量
+    skipped += len(raw_codes) - len(unique_codes)
+    
+    for code in unique_codes:
         stmt = select(DownloadRecord).where(DownloadRecord.code == code)
         result = await db.execute(stmt)
         if not result.scalar_one_or_none():
