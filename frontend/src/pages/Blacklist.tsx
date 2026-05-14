@@ -64,12 +64,14 @@ export function Blacklist() {
       const response = await axios.post('http://127.0.0.1:8000/api/blacklist/add', {
         names: manualNames
       });
-      alert(`成功录入了 ${response.data.added} 位演员到黑名单！`);
+      const added = response.data.added || 0;
+      const skipped = response.data.skipped || 0;
+      alert(`录入完成！\n✅ 成功添加：${added} 位演员\n🚧 重复跳过：${skipped} 位演员`);
       setManualNames('');
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add to blacklist', error);
-      alert('录入失败，请检查后端状态。');
+      alert(`录入失败，请检查后端状态。\n错误详情: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }

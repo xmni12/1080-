@@ -101,6 +101,7 @@ async def get_records(
 @router.post("/manual")
 async def add_manual_records(request: ManualEntryRequest, db: AsyncSession = Depends(get_db)):
     added = 0
+    skipped = 0
     codes = [c.strip().upper() for c in request.codes.split('\n') if c.strip()]
     for code in codes:
         stmt = select(DownloadRecord).where(DownloadRecord.code == code)
@@ -115,8 +116,10 @@ async def add_manual_records(request: ManualEntryRequest, db: AsyncSession = Dep
             )
             db.add(record)
             added += 1
+        else:
+            skipped += 1
     await db.commit()
-    return {"status": "success", "added": added}
+    return {"status": "success", "added": added, "skipped": skipped}
 
 @router.post("/delete")
 async def delete_records(request: DeleteRequest, db: AsyncSession = Depends(get_db)):

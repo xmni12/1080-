@@ -36,6 +36,7 @@ async def get_blacklist(
 @router.post("/add")
 async def add_blacklist(request: AddBlacklistRequest, db: AsyncSession = Depends(get_db)):
     added = 0
+    skipped = 0
     names = [n.strip() for n in request.names.split('\n') if n.strip()]
     for name in names:
         stmt = select(BlacklistActor).where(BlacklistActor.name == name)
@@ -44,8 +45,10 @@ async def add_blacklist(request: AddBlacklistRequest, db: AsyncSession = Depends
             actor = BlacklistActor(name=name, added_time=datetime.now())
             db.add(actor)
             added += 1
+        else:
+            skipped += 1
     await db.commit()
-    return {"status": "success", "added": added}
+    return {"status": "success", "added": added, "skipped": skipped}
 
 @router.post("/delete")
 async def delete_blacklist(request: DeleteRequest, db: AsyncSession = Depends(get_db)):

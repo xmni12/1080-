@@ -107,7 +107,9 @@ export function Database() {
         codes: manualCodes,
         section: manualSection
       });
-      alert(`成功录入了 ${response.data.added} 个番号！`);
+      const added = response.data.added || 0;
+      const skipped = response.data.skipped || 0;
+      alert(`录入完成！\n✅ 成功添加：${added} 个番号\n🚧 重复跳过：${skipped} 个番号`);
       setManualCodes('');
       fetchData();
     } catch (error) {
