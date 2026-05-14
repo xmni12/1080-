@@ -68,3 +68,17 @@ class PaginatedBlacklistResponse(BaseModel):
 
 class AddBlacklistRequest(BaseModel):
     names: str
+
+class WhitelistActorResponse(BaseModel):
+    id: int
+    name: str
+    added_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedWhitelistResponse(BaseModel):
+    total: int
+    items: List[WhitelistActorResponse]
+
+class AddWhitelistRequest(BaseModel):
+    names: str

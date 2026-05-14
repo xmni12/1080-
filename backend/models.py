@@ -31,3 +31,10 @@ class BlacklistActor(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="女优名称")
     added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")
+
+class WhitelistActor(Base):
+    __tablename__ = "whitelist_actors"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="女优名称")
+    added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")

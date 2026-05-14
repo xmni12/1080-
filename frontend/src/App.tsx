@@ -4,6 +4,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Tasks } from './pages/Tasks';
 import { Database } from './pages/Database';
 import { Settings } from './pages/Settings';
+import { Blacklist } from './pages/Blacklist';
+import { Whitelist } from './pages/Whitelist';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -13,6 +15,8 @@ function App() {
       {currentTab === 'dashboard' && <Dashboard />}
       {currentTab === 'tasks' && <Tasks />}
       {currentTab === 'database' && <Database />}
+      {currentTab === 'blacklist' && <Blacklist />}
+      {currentTab === 'whitelist' && <Whitelist />}
       {currentTab === 'settings' && <Settings />}
     </Layout>
   );

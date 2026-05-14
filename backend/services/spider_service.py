@@ -9,7 +9,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from DrissionPage import ChromiumPage
 
-from backend.models import DownloadRecord, BlacklistActor
+from backend.models import DownloadRecord, BlacklistActor, WhitelistActor
 from backend.services.avbase_client import avbase_client
 from core.utils import extract_code
 
@@ -191,18 +191,43 @@ class DiscuzSpiderService:
                         if skip_download:
                             return
                         
-                        # --- AVBase 演员黑名单拦截拦截 ---
+                        # --- AVBase 智能多维演员滤网 (A+B方案) ---
                         actors = await avbase_client.get_actors_by_code(code)
                         if actors:
                             async with db_lock:
-                                stmt = select(BlacklistActor.name).where(BlacklistActor.name.in_(actors))
-                                result = await session.execute(stmt)
-                                blocked_actors = result.scalars().all()
+                                # A: 优先检查白名单豁免权
+                                wl_stmt = select(WhitelistActor.name).where(WhitelistActor.name.in_(actors))
+                                wl_result = await session.execute(wl_stmt)
+                                whitelisted = wl_result.scalars().all()
                                 
-                                if blocked_actors:
-                                    blocked_names = ", ".join(blocked_actors)
-                                    self._log(f"🚧 [{code}] 黑名单拦截：含演员 [{blocked_names}]，已丢弃！", level="warn")
-                                    return
+                                if whitelisted:
+                                    wl_names = ", ".join(whitelisted)
+                                    # 如果命中了白名单，直接跳过黑名单检查，无敌放行
+                                    self._log(f"💖 [{code}] 喜爱名单特权：包含心动女优 [{wl_names}]，最高优先级放行！", level="success")
+                                else:
+                                    # B: 没有白名单保护时，检查黑名单
+                                    bl_stmt = select(BlacklistActor.name).where(BlacklistActor.name.in_(actors))
+                                    bl_result = await session.execute(bl_stmt)
+                                    blocked = bl_result.scalars().all()
+                                    
+                                    if blocked:
+                                        if len(actors) == 1:
+                                            # 单体作品，直接枪毙
+                                            self._log(f"🚧 [{code}] 单人黑名单拦截：主演 [{blocked[0]}]，已丢弃！", level="warn")
+                                            return
+                                        else:
+                                            # 多人共演
+                                            if len(blocked) == len(actors):
+                                                # 全员恶人，全在黑名单里
+                                                blocked_names = ", ".join(blocked)
+                                                self._log(f"🚧 [{code}] 全员黑名单拦截：所有主演 [{blocked_names}] 皆被封杀，已丢弃！", level="warn")
+                                                return
+                                            else:
+                                                # 存在非黑名单的其他演员（陌生人），手下留情
+                                                strangers = [a for a in actors if a not in blocked]
+                                                stranger_names = ", ".join(strangers)
+                                                blocked_names = ", ".join(blocked)
+                                                self._log(f"💡 [{code}] 多人共演豁免：虽然含黑名单 [{blocked_names}]，但存在共演 [{stranger_names}]，放行下载。", level="info")
                         
                         async with sem:
                             if self.stop_requested: return
