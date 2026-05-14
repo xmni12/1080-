@@ -54,3 +54,17 @@ class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
     spider_threads: int = 1
+
+class BlacklistActorResponse(BaseModel):
+    id: int
+    name: str
+    added_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedBlacklistResponse(BaseModel):
+    total: int
+    items: List[BlacklistActorResponse]
+
+class AddBlacklistRequest(BaseModel):
+    names: str

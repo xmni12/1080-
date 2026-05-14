@@ -9,7 +9,7 @@ interface LogConsoleProps {
   isConnected: boolean;
 }
 
-type FilterType = 'all' | 'error' | 'success';
+type FilterType = 'all' | 'error' | 'success' | 'warn';
 
 export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
   const endOfLogsRef = useRef<HTMLDivElement>(null);
@@ -22,8 +22,9 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
 
   const filteredLogs = logs.filter(log => {
     if (filter === 'all') return true;
-    if (filter === 'error') return log.level === 'error' || log.level === 'warn';
+    if (filter === 'error') return log.level === 'error';
     if (filter === 'success') return log.level === 'success';
+    if (filter === 'warn') return log.level === 'warn';
     return true;
   });
 
@@ -56,7 +57,7 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
                 filter === 'error' ? "bg-red-500/20 text-red-400" : "text-slate-400 hover:text-red-300"
               )}
             >
-              仅警告/错误
+              仅报错 ❌
             </button>
             <button
               onClick={() => setFilter('success')}
@@ -65,7 +66,16 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
                 filter === 'success' ? "bg-green-500/20 text-green-400" : "text-slate-400 hover:text-green-300"
               )}
             >
-              仅成功
+              仅成功 ✅
+            </button>
+            <button
+              onClick={() => setFilter('warn')}
+              className={clsx(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                filter === 'warn' ? "bg-amber-500/20 text-amber-400" : "text-slate-400 hover:text-amber-300"
+              )}
+            >
+              仅拦截/跳过 🚧
             </button>
           </div>
           <button 
@@ -91,7 +101,7 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
                 <span className={clsx(
                   "shrink-0 font-semibold w-12",
                   log.level === 'info' && "text-blue-400",
-                  log.level === 'warn' && "text-yellow-400",
+                  log.level === 'warn' && "text-amber-400",
                   log.level === 'error' && "text-red-400",
                   log.level === 'success' && "text-green-400"
                 )}>
@@ -99,7 +109,9 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
                 </span>
                 <span className={clsx(
                   "break-all",
-                  log.level === 'error' ? "text-red-300" : "text-slate-300"
+                  log.level === 'error' && "text-red-300",
+                  log.level === 'warn' && "text-amber-300",
+                  log.level !== 'error' && log.level !== 'warn' && "text-slate-300"
                 )}>
                   {log.content}
                 </span>

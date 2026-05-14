@@ -1,12 +1,27 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import records, tasks, websocket, settings
+from backend.routers import records, tasks, websocket, settings, blacklist
 from backend.database import engine, Base
 from backend.services.scheduler_service import scheduler_service
 from backend.services.task_manager import task_manager
 from backend import models
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="DiscuzSpider API")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    body = await request.body()
+    logger.error(f"Validation Error: {exc.errors()}")
+    logger.error(f"Request Body: {body.decode()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": body.decode()},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,6 +42,7 @@ app.include_router(records.router)
 app.include_router(tasks.router)
 app.include_router(websocket.router)
 app.include_router(settings.router)
+app.include_router(blacklist.router)
 
 @app.get("/")
 async def read_root():

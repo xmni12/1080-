@@ -1,0 +1,299 @@
+import { useState, useEffect } from 'react';
+import { Search, PlusCircle, Trash2, UserX, ChevronLeft, ChevronRight, Ban, Loader2 } from 'lucide-react';
+import { clsx } from 'clsx';
+import axios from 'axios';
+
+interface BlacklistActor {
+  id: number;
+  name: string;
+  added_time: string;
+}
+
+export function Blacklist() {
+  const [actors, setActors] = useState<BlacklistActor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // 分页与筛选
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  
+  // 录入状态
+  const [manualNames, setManualNames] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // 选择状态
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // 当筛选改变时重置页码
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchData();
+    }, 300); // 搜索防抖
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, page, pageSize]);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const res = await axios.get(`http://127.0.0.1:8000/api/blacklist/`, { 
+        params: { search, page, page_size: pageSize } 
+      });
+      setActors(res.data.items);
+      setTotalRecords(res.data.total);
+      setSelectedIds(new Set());
+    } catch (error) {
+      console.error('Failed to fetch blacklist', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+
+  const handleManualSubmit = async () => {
+    if (!manualNames.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/blacklist/add', {
+        names: manualNames
+      });
+      alert(`成功录入了 ${response.data.added} 位演员到黑名单！`);
+      setManualNames('');
+      fetchData();
+    } catch (error) {
+      console.error('Failed to add to blacklist', error);
+      alert('录入失败，请检查后端状态。');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === actors.length && actors.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(actors.map(a => a.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`确认要将选中的 ${selectedIds.size} 位演员从黑名单中移除吗？`)) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/blacklist/delete', {
+        ids: Array.from(selectedIds)
+      });
+      alert(`成功移除了 ${response.data.deleted} 位演员。`);
+      fetchData();
+    } catch (error) {
+      console.error('Failed to delete from blacklist', error);
+      alert('删除失败，请重试。');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full gap-6">
+      
+      {/* 顶部说明面板 */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 shadow-md text-white flex items-center justify-between">
+         <div className="flex items-start gap-4">
+            <div className="bg-white/10 p-3 rounded-xl border border-white/20">
+               <Ban className="w-6 h-6 text-rose-400" />
+            </div>
+            <div>
+               <h3 className="text-xl font-bold mb-1 tracking-wide">智能演员过滤拦截网 (AVBase)</h3>
+               <p className="text-slate-300 text-sm">
+                  爬虫抓取到新番号后，会通过静态 API 解析该番号对应的女优阵列。如果命中以下黑名单库，任务将立刻中止并拦截，确保下载配额 100% 用于精品资源。
+               </p>
+            </div>
+         </div>
+         <div className="flex flex-col items-end">
+            <span className="text-3xl font-black text-rose-400">{totalRecords}</span>
+            <span className="text-xs font-medium text-slate-400 tracking-wider">已拦截目标库</span>
+         </div>
+      </div>
+
+      <div className="flex gap-6 h-full min-h-0">
+        {/* 左侧：手动录入 */}
+        <div className="w-1/4 bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col h-fit">
+          <h3 className="text-md font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <PlusCircle className="w-4 h-4 text-primary" />
+            快速封杀录入
+          </h3>
+          <div className="space-y-4 flex-1 flex flex-col">
+            <div className="flex flex-col gap-2 flex-1">
+              <label className="text-xs font-medium text-slate-500">拦截名单 (支持批量，每行一位)</label>
+              <textarea 
+                value={manualNames}
+                onChange={(e) => setManualNames(e.target.value)}
+                className="w-full flex-1 p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none min-h-[250px]"
+                placeholder="输入不感兴趣的演员姓名...&#10;例如：&#10;水卜樱&#10;星川光希"
+              />
+            </div>
+            <button 
+              onClick={handleManualSubmit}
+              disabled={!manualNames.trim() || isSubmitting}
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm mt-2"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "确 认 录 入"}
+            </button>
+          </div>
+        </div>
+
+        {/* 右侧：表格 */}
+        <div className="w-3/4 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          
+          {/* 表格工具栏 */}
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="relative w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text"
+                placeholder="搜索黑名单演员姓名..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+              />
+            </div>
+
+            <button 
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0 || isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              移出黑名单 ({selectedIds.size})
+            </button>
+          </div>
+
+          {/* 表格主体 */}
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-white border-b border-slate-100 z-10 shadow-sm">
+                <tr className="text-slate-500 text-xs uppercase tracking-wider">
+                  <th className="px-5 py-3 font-medium w-10 text-center">
+                    <input 
+                      type="checkbox"
+                      checked={selectedIds.size === actors.length && actors.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-3.5 h-3.5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-5 py-3 font-medium">目标演员</th>
+                  <th className="px-5 py-3 font-medium w-1/3">封杀时间</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 opacity-50 text-primary" />
+                      正在加载数据...
+                    </td>
+                  </tr>
+                ) : actors.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-12 text-center text-slate-400 italic">
+                      {search ? "没有找到符合条件的记录" : "黑名单目前为空，快去添加吧"}
+                    </td>
+                  </tr>
+                ) : (
+                  actors.map(actor => (
+                    <tr 
+                      key={actor.id} 
+                      onClick={() => toggleSelect(actor.id)}
+                      className={clsx(
+                        "transition-colors cursor-pointer",
+                        selectedIds.has(actor.id) ? "bg-rose-50/40" : "hover:bg-slate-50/80"
+                      )}
+                    >
+                      <td className="px-5 py-3 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedIds.has(actor.id)}
+                          onChange={() => toggleSelect(actor.id)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-3.5 h-3.5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="font-bold text-slate-800 flex items-center gap-2">
+                           <UserX className="w-4 h-4 text-slate-300" />
+                           {actor.name}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">
+                        {new Date(actor.added_time).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 表格分页底部 */}
+          <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-slate-500">
+                共 <span className="font-semibold text-slate-700">{totalRecords}</span> 个拦截目标
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">每页</span>
+                <select 
+                  value={pageSize}
+                  onChange={e => setPageSize(Number(e.target.value))}
+                  className="bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md px-2 py-1 outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+                <span className="text-xs text-slate-500">条</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || isLoading}
+                className="p-1 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-xs font-medium text-slate-700 px-3">
+                {page} / {totalPages > 0 ? totalPages : 1}
+              </span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isLoading}
+                className="p-1 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

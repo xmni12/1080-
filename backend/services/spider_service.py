@@ -9,20 +9,21 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from DrissionPage import ChromiumPage
 
-from backend.models import DownloadRecord
+from backend.models import DownloadRecord, BlacklistActor
+from backend.services.avbase_client import avbase_client
 from core.utils import extract_code
 
 logger = logging.getLogger(__name__)
 
 class DiscuzSpiderService:
-    def __init__(self, page: Optional[ChromiumPage] = None, log_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self, page: Optional[ChromiumPage] = None, log_callback: Optional[Callable[[str, str], None]] = None):
         self.page = page
         self.log_callback = log_callback
         self.stop_requested = False
 
-    def _log(self, message: str):
+    def _log(self, message: str, level: str = "info"):
         if self.log_callback:
-            self.log_callback(message)
+            self.log_callback(message, level)
         logger.info(message)
 
     async def _human_delay(self, config: Dict[str, Any], min_s=1.5, max_s=4.0):
@@ -173,13 +174,13 @@ class DiscuzSpiderService:
                                 if await self.check_code_exists_in_section(session, '4k', code):
                                     skip_download = True
                                 elif await self.check_code_exists_in_section(session, 'hd', code):
-                                    self._log(f"[检测升级] {code} 在 HD 库已存在，正在准备升级为 4K...")
+                                    self._log(f"🔄 [检测升级] {code} 在 HD 库已存在，正在准备升级为 4K...", level="info")
                                     is_upgrade = True
                                 elif is_global_exists:
                                     skip_download = True
                             elif section_key == 'hd':
                                 if await self.check_code_exists_in_section(session, '4k', code):
-                                    self._log(f"[避让] {code} 在 4K 库已存在，HD 版块跳过。")
+                                    self._log(f"🚧 [避让] {code} 在 4K 库已存在，HD 版块跳过。", level="warn")
                                     skip_download = True
                                 elif is_global_exists:
                                     skip_download = True
@@ -189,6 +190,19 @@ class DiscuzSpiderService:
                         
                         if skip_download:
                             return
+                        
+                        # --- AVBase 演员黑名单拦截拦截 ---
+                        actors = await avbase_client.get_actors_by_code(code)
+                        if actors:
+                            async with db_lock:
+                                stmt = select(BlacklistActor.name).where(BlacklistActor.name.in_(actors))
+                                result = await session.execute(stmt)
+                                blocked_actors = result.scalars().all()
+                                
+                                if blocked_actors:
+                                    blocked_names = ", ".join(blocked_actors)
+                                    self._log(f"🚧 [{code}] 黑名单拦截：含演员 [{blocked_names}]，已丢弃！", level="warn")
+                                    return
                         
                         async with sem:
                             if self.stop_requested: return
