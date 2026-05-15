@@ -37,19 +37,32 @@ async def get_whitelist(
 async def add_whitelist(request: AddWhitelistRequest, db: AsyncSession = Depends(get_db)):
     added = 0
     skipped = 0
-    raw_names = [n.strip() for n in request.names.split('\n') if n.strip()]
-    unique_names = list(dict.fromkeys(raw_names))
+    raw_lines = [n.strip() for n in request.names.split('\n') if n.strip()]
     
-    skipped += len(raw_names) - len(unique_names)
-    
-    for name in unique_names:
+    unique_names = {}
+    for line in raw_lines:
+        parts = [p.strip() for p in line.split(',') if p.strip()]
+        if not parts:
+            continue
+        primary_name = parts[0]
+        aliases = ",".join(parts[1:])
+        
+        if primary_name not in unique_names:
+            unique_names[primary_name] = aliases
+        else:
+            skipped += 1
+
+    for name, aliases in unique_names.items():
         stmt = select(WhitelistActor).where(WhitelistActor.name == name)
         result = await db.execute(stmt)
-        if not result.scalar_one_or_none():
-            actor = WhitelistActor(name=name, added_time=datetime.now())
-            db.add(actor)
+        actor = result.scalar_one_or_none()
+        if not actor:
+            new_actor = WhitelistActor(name=name, aliases=aliases, added_time=datetime.now())
+            db.add(new_actor)
             added += 1
         else:
+            if aliases and actor.aliases != aliases:
+                actor.aliases = aliases
             skipped += 1
     await db.commit()
     return {"status": "success", "added": added, "skipped": skipped}

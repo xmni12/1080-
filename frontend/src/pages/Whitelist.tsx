@@ -6,10 +6,13 @@ import axios from 'axios';
 interface WhitelistActor {
   id: number;
   name: string;
+  aliases: string;
+  avatar_url: string | null;
   added_time: string;
 }
 
 export function Whitelist() {
+// ... 保持原有钩子和函数不变 ...
   const [actors, setActors] = useState<WhitelistActor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -237,10 +240,23 @@ export function Whitelist() {
                         />
                       </td>
                       <td className="px-5 py-3">
-                        <span className="font-bold text-slate-800 flex items-center gap-2">
-                           <Heart className="w-4 h-4 text-rose-400" />
-                           {actor.name}
-                        </span>
+                        <div className="flex items-center gap-3">
+                           {actor.avatar_url ? (
+                             <img src={actor.avatar_url} alt={actor.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm" />
+                           ) : (
+                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                               <Heart className="w-4 h-4 text-emerald-400" />
+                             </div>
+                           )}
+                           <div className="flex flex-col">
+                             <span className="font-bold text-slate-800">{actor.name}</span>
+                             {actor.aliases && (
+                               <span className="text-[10px] text-slate-400 max-w-[150px] truncate" title={actor.aliases}>
+                                 别名: {actor.aliases}
+                               </span>
+                             )}
+                           </div>
+                        </div>
                       </td>
                       <td className="px-5 py-3 text-slate-400 text-xs">
                         {new Date(actor.added_time).toLocaleString()}

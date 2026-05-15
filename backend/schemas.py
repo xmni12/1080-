@@ -58,6 +58,8 @@ class GlobalSettings(BaseModel):
 class BlacklistActorResponse(BaseModel):
     id: int
     name: str
+    aliases: str = ""
+    avatar_url: Optional[str] = None
     added_time: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -72,6 +74,8 @@ class AddBlacklistRequest(BaseModel):
 class WhitelistActorResponse(BaseModel):
     id: int
     name: str
+    aliases: str = ""
+    avatar_url: Optional[str] = None
     added_time: datetime
 
     model_config = ConfigDict(from_attributes=True)

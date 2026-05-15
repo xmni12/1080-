@@ -30,6 +30,8 @@ class BlacklistActor(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="女优名称")
+    aliases: Mapped[str] = mapped_column(String(500), default="", server_default="", comment="曾用名/别名(逗号分隔)")
+    avatar_url: Mapped[str] = mapped_column(String(500), nullable=True, comment="头像URL")
     added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")
 
 class WhitelistActor(Base):
@@ -37,4 +39,6 @@ class WhitelistActor(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="女优名称")
+    aliases: Mapped[str] = mapped_column(String(500), default="", server_default="", comment="曾用名/别名(逗号分隔)")
+    avatar_url: Mapped[str] = mapped_column(String(500), nullable=True, comment="头像URL")
     added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")

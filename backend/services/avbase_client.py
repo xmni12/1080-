@@ -30,12 +30,32 @@ class AvbaseClient:
                 html_text = resp.text
                 
                 import urllib.parse
-                # 提取 /talents/ 后面的 URL 编码的演员名称，无视 A 标签内部复杂的嵌套结构
-                pattern = r'href=["\'][^"\']*/talents/([^"\']+)["\']'
-                matches = re.findall(pattern, html_text)
                 
-                # 解码、去重并清理空白
-                actors = list(set([urllib.parse.unquote(m).strip() for m in matches if m.strip()]))
+                # 匹配整个 <a href="/talents/xxx">...</a> 块
+                a_tags = re.findall(r'(<a\s+[^>]*href=["\'][^"\']*/talents/[^"\']+["\'][^>]*>.*?</a>)', html_text)
+                
+                actors = []
+                seen = set()
+                
+                for a_tag in a_tags:
+                    # 提取名字 (URL编码)
+                    name_match = re.search(r'href=["\'][^"\']*/talents/([^"\']+)["\']', a_tag)
+                    if not name_match:
+                        continue
+                    name = urllib.parse.unquote(name_match.group(1)).strip()
+                    
+                    if not name or name in seen:
+                        continue
+                        
+                    # 尝试提取头像 URL
+                    img_match = re.search(r'src=["\']([^"\']+\.(?:jpg|png|jpeg|webp))["\']', a_tag)
+                    avatar_url = img_match.group(1) if img_match else None
+                    
+                    actors.append({
+                        "name": name,
+                        "avatar_url": avatar_url
+                    })
+                    seen.add(name)
                 
                 return actors
 

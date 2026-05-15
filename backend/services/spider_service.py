@@ -192,42 +192,68 @@ class DiscuzSpiderService:
                             return
                         
                         # --- AVBase 智能多维演员滤网 (A+B方案) ---
-                        actors = await avbase_client.get_actors_by_code(code)
-                        if actors:
+                        actors_info = await avbase_client.get_actors_by_code(code)
+                        if actors_info:
+                            actor_names = [a["name"] for a in actors_info]
                             async with db_lock:
-                                # A: 优先检查白名单豁免权
-                                wl_stmt = select(WhitelistActor.name).where(WhitelistActor.name.in_(actors))
-                                wl_result = await session.execute(wl_stmt)
-                                whitelisted = wl_result.scalars().all()
+                                wl_stmt = select(WhitelistActor)
+                                wl_all = (await session.execute(wl_stmt)).scalars().all()
+                                bl_stmt = select(BlacklistActor)
+                                bl_all = (await session.execute(bl_stmt)).scalars().all()
+                                
+                                whitelisted = []
+                                for wl in wl_all:
+                                    wl_aliases = [n.strip() for n in wl.aliases.split(',')] if wl.aliases else []
+                                    wl_names_set = set([wl.name] + wl_aliases)
+                                    matching_names = wl_names_set.intersection(set(actor_names))
+                                    if matching_names:
+                                        whitelisted.append(wl.name)
+                                        if not wl.avatar_url:
+                                            for info in actors_info:
+                                                if info["name"] in matching_names and info["avatar_url"]:
+                                                    wl.avatar_url = info["avatar_url"]
+                                                    break
                                 
                                 if whitelisted:
-                                    wl_names = ", ".join(whitelisted)
+                                    await session.commit()
+                                    wl_names_str = ", ".join(whitelisted)
                                     # 如果命中了白名单，直接跳过黑名单检查，无敌放行
-                                    self._log(f"💖 [{code}] 喜爱名单特权：包含心动女优 [{wl_names}]，最高优先级放行！", level="success")
+                                    self._log(f"💖 [{code}] 喜爱名单特权：包含心动女优 [{wl_names_str}]，最高优先级放行！", level="success")
                                 else:
-                                    # B: 没有白名单保护时，检查黑名单
-                                    bl_stmt = select(BlacklistActor.name).where(BlacklistActor.name.in_(actors))
-                                    bl_result = await session.execute(bl_stmt)
-                                    blocked = bl_result.scalars().all()
+                                    blocked = []
+                                    for bl in bl_all:
+                                        bl_aliases = [n.strip() for n in bl.aliases.split(',')] if bl.aliases else []
+                                        bl_names_set = set([bl.name] + bl_aliases)
+                                        matching_names = bl_names_set.intersection(set(actor_names))
+                                        if matching_names:
+                                            blocked.append(bl.name)
+                                            if not bl.avatar_url:
+                                                for info in actors_info:
+                                                    if info["name"] in matching_names and info["avatar_url"]:
+                                                        bl.avatar_url = info["avatar_url"]
+                                                        break
                                     
                                     if blocked:
-                                        if len(actors) == 1:
+                                        await session.commit()
+                                        if len(actor_names) == 1:
                                             # 单体作品，直接枪毙
                                             self._log(f"🚧 [{code}] 单人黑名单拦截：主演 [{blocked[0]}]，已丢弃！", level="warn")
                                             return
                                         else:
                                             # 多人共演
-                                            if len(blocked) == len(actors):
+                                            if len(blocked) == len(actor_names):
                                                 # 全员恶人，全在黑名单里
                                                 blocked_names = ", ".join(blocked)
                                                 self._log(f"🚧 [{code}] 全员黑名单拦截：所有主演 [{blocked_names}] 皆被封杀，已丢弃！", level="warn")
                                                 return
                                             else:
                                                 # 存在非黑名单的其他演员（陌生人），手下留情
-                                                strangers = [a for a in actors if a not in blocked]
+                                                strangers = [a for a in actor_names if a not in blocked]
                                                 stranger_names = ", ".join(strangers)
                                                 blocked_names = ", ".join(blocked)
                                                 self._log(f"💡 [{code}] 多人共演豁免：虽然含黑名单 [{blocked_names}]，但存在共演 [{stranger_names}]，放行下载。", level="info")
+                                                
+                                await session.commit() # Ensure any avatar updates are saved even if not blocked/whitelisted
                         
                         async with sem:
                             if self.stop_requested: return
@@ -248,10 +274,10 @@ class DiscuzSpiderService:
                                 msg = f"✅ [{code}] 成功入库" + (" (画质已升档)" if is_upgrade else "")
                                 self._log(msg)
                             elif result == "QUOTA_LIMIT":
-                                self._log("！！！触发论坛防御：配额或次数已满，强制停止！！！")
+                                self._log("！！！触发论坛防御：配额或次数已满，强制停止！！！", level="error")
                                 self.stop_requested = True
                             elif result == "CF_BLOCKED":
-                                self._log(f"❌ [{code}] 失败跳过：详情页被 CF 盾拦截。")
+                                self._log(f"❌ [{code}] 失败跳过：详情页被 CF 盾拦截。", level="error")
                             else:
                                 if result == "NO_ATTACHMENT": err_msg = "当前帖子中未找到任何附件下载链接"
                                 elif result.startswith("HTTP_ERROR_"): err_msg = f"访问详情页被拒绝 ({result})"
@@ -261,7 +287,7 @@ class DiscuzSpiderService:
                                 elif result.startswith("ERR:"): err_msg = f"网络/解析异常 ({result[4:]})"
                                 else: err_msg = f"未知异常 ({result})"
                                 
-                                self._log(f"❌ [{code}] 失败跳过：{err_msg}")
+                                self._log(f"❌ [{code}] 失败跳过：{err_msg}", level="error")
                             
                             await asyncio.sleep(random.uniform(1.0, 3.0))
 
