@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/whitelist", tags=["whitelist"])
 async def get_whitelist(
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=1000),
+    page_size: int = Query(10, ge=1, le=100000),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(WhitelistActor)
