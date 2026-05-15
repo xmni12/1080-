@@ -42,3 +42,14 @@ class WhitelistActor(Base):
     aliases: Mapped[str] = mapped_column(String(500), default="", server_default="", comment="曾用名/别名(逗号分隔)")
     avatar_url: Mapped[str] = mapped_column(String(500), nullable=True, comment="头像URL")
     added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")
+
+class FailedRecord(Base):
+    __tablename__ = "failed_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    section: Mapped[str] = mapped_column(String(100), index=True, comment="版块名称")
+    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, comment="番号")
+    title: Mapped[str] = mapped_column(String(255), comment="帖子标题")
+    post_url: Mapped[str] = mapped_column(String(255), comment="帖子链接")
+    reason: Mapped[str] = mapped_column(String(500), comment="失败原因")
+    failed_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="失败时间")

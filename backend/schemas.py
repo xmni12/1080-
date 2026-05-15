@@ -64,6 +64,21 @@ class BlacklistActorResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class FailedRecordResponse(BaseModel):
+    id: int
+    section: str
+    code: str
+    title: str
+    post_url: str
+    reason: str
+    failed_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedFailedRecordResponse(BaseModel):
+    total: int
+    items: List[FailedRecordResponse]
+
 class PaginatedBlacklistResponse(BaseModel):
     total: int
     items: List[BlacklistActorResponse]

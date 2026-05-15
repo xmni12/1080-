@@ -6,6 +6,7 @@ import { Database } from './pages/Database';
 import { Settings } from './pages/Settings';
 import { Blacklist } from './pages/Blacklist';
 import { Whitelist } from './pages/Whitelist';
+import { FailedRecords } from './pages/FailedRecords';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -14,6 +15,7 @@ function App() {
     <Layout currentTab={currentTab} setCurrentTab={setCurrentTab}>
       {currentTab === 'dashboard' && <Dashboard />}
       {currentTab === 'tasks' && <Tasks />}
+      {currentTab === 'failed_records' && <FailedRecords />}
       {currentTab === 'database' && <Database />}
       {currentTab === 'blacklist' && <Blacklist />}
       {currentTab === 'whitelist' && <Whitelist />}

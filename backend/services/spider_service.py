@@ -9,7 +9,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from DrissionPage import ChromiumPage
 
-from backend.models import DownloadRecord, BlacklistActor, WhitelistActor
+from backend.models import DownloadRecord, BlacklistActor, WhitelistActor, FailedRecord
 from backend.services.avbase_client import avbase_client
 from core.utils import extract_code
 
@@ -284,10 +284,30 @@ class DiscuzSpiderService:
                                 elif result.startswith("DL_HTTP_ERROR_"): err_msg = f"附件下载被拒绝 ({result})"
                                 elif result == "TIMEOUT": err_msg = "纯代码网络引擎请求超时，可能代理波动"
                                 elif result == "NO_VALID_DOWNLOAD": err_msg = "找到了附件链接，但所有的下载尝试均失败"
+                                elif result == "INVALID_FILE_CONTENT": err_msg = "文件魔数不匹配，疑似下载到了伪装的报错页"
                                 elif result.startswith("ERR:"): err_msg = f"网络/解析异常 ({result[4:]})"
                                 else: err_msg = f"未知异常 ({result})"
                                 
                                 self._log(f"❌ [{code}] 失败跳过：{err_msg}", level="error")
+                                
+                                # 将失败的记录持久化到重试池
+                                async with db_lock:
+                                    fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                                    fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                                    if not fail_record:
+                                        new_failed = FailedRecord(
+                                            section=section_key,
+                                            code=code.upper(),
+                                            title=title,
+                                            post_url=post_url,
+                                            reason=err_msg,
+                                            failed_time=datetime.now()
+                                        )
+                                        session.add(new_failed)
+                                    else:
+                                        fail_record.reason = err_msg
+                                        fail_record.failed_time = datetime.now()
+                                    await session.commit()
                             
                             await asyncio.sleep(random.uniform(1.0, 3.0))
 
