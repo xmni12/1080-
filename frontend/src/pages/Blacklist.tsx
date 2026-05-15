@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, PlusCircle, Trash2, UserX, ChevronLeft, ChevronRight, Ban, Loader2 } from 'lucide-react';
+import { Search, PlusCircle, Trash2, UserX, ChevronLeft, ChevronRight, Ban, Loader2, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 import axios from 'axios';
 
@@ -115,6 +115,28 @@ export function Blacklist() {
     }
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      const res = await axios.get(`http://127.0.0.1:8000/api/blacklist/`, { 
+        params: { search: '', page: 1, page_size: 10000 } 
+      });
+      const lines = res.data.items.map((actor: BlacklistActor) => {
+        return actor.aliases ? `${actor.name},${actor.aliases}` : actor.name;
+      }).join('\n');
+      
+      await navigator.clipboard.writeText(lines);
+      alert(`成功导出 ${res.data.items.length} 个目标到剪贴板！可以直接粘贴到任意文本中备份。`);
+    } catch (error) {
+      console.error('Failed to export blacklist', error);
+      alert('导出失败，请重试。');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-6">
       
@@ -180,14 +202,26 @@ export function Blacklist() {
               />
             </div>
 
-            <button 
-              onClick={handleBulkDelete}
-              disabled={selectedIds.size === 0 || isDeleting}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
-            >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              移出黑名单 ({selectedIds.size})
-            </button>
+            <div className="flex items-center gap-3">
+                <button 
+                onClick={handleExport}
+                disabled={totalRecords === 0 || isExporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-indigo-100"
+                title="一键导出全部黑名单到剪贴板"
+                >
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                全量导出
+                </button>
+
+                <button 
+                onClick={handleBulkDelete}
+                disabled={selectedIds.size === 0 || isDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
+                >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                移出黑名单 ({selectedIds.size})
+                </button>
+            </div>
           </div>
 
           {/* 表格主体 */}
