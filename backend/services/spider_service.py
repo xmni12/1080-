@@ -191,6 +191,8 @@ class DiscuzSpiderService:
                         if skip_download:
                             return
                         
+                        task_save_path = save_path
+                        
                         # --- AVBase 智能多维演员滤网 (A+B方案) ---
                         actors_info = await avbase_client.get_actors_by_code(code)
                         if actors_info:
@@ -202,12 +204,14 @@ class DiscuzSpiderService:
                                 bl_all = (await session.execute(bl_stmt)).scalars().all()
                                 
                                 whitelisted = []
+                                covered_actor_names = set()
                                 for wl in wl_all:
                                     wl_aliases = [n.strip() for n in wl.aliases.split(',')] if wl.aliases else []
                                     wl_names_set = set([wl.name] + wl_aliases)
                                     matching_names = wl_names_set.intersection(set(actor_names))
                                     if matching_names:
                                         whitelisted.append(wl.name)
+                                        covered_actor_names.update(matching_names)
                                         if not wl.avatar_url:
                                             for info in actors_info:
                                                 if info["name"] in matching_names and info["avatar_url"]:
@@ -219,6 +223,18 @@ class DiscuzSpiderService:
                                     wl_names_str = ", ".join(whitelisted)
                                     # 如果命中了白名单，直接跳过黑名单检查，无敌放行
                                     self._log(f"💖 [{code}] 喜爱名单特权：包含心动女优 [{wl_names_str}]，最高优先级放行！", level="success")
+                                    
+                                    # 纯净度过滤：抓取到的演员集合是白名单集合的子集 (全员皆爱，100% 纯净)
+                                    is_pure = len(covered_actor_names) == len(actor_names)
+                                    if is_pure:
+                                        wl_save_path = config.get('whitelist_save_path', '').strip()
+                                        if wl_save_path:
+                                            task_save_path = wl_save_path
+                                        else:
+                                            task_save_path = os.path.join(save_path, "精选演员")
+                                        
+                                        if not os.path.exists(task_save_path):
+                                            os.makedirs(task_save_path)
                                 else:
                                     blocked = []
                                     for bl in bl_all:
@@ -264,7 +280,7 @@ class DiscuzSpiderService:
                                 
                             self._log(f"[并发线程] 正在处理: {code}")
                             
-                            result = await self._download_attachments(post_url, code, save_path, config)
+                            result = await self._download_attachments(post_url, code, task_save_path, config)
                             
                             if result == "SUCCESS":
                                 async with db_lock:
