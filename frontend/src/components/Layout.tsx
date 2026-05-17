@@ -22,6 +22,7 @@ export function Layout({ children, currentTab, setCurrentTab }: LayoutProps) {
           <h2 className="text-xl font-semibold text-slate-800 capitalize">
             {currentTab === 'dashboard' && '仪表盘 Dashboard'}
             {currentTab === 'tasks' && '任务中心 Tasks Center'}
+            {currentTab === 'completion' && '女优补全计划 Completion Plan'}
             {currentTab === 'failed_records' && '死链回收站 Failed Records'}
             {currentTab === 'database' && '全局仓库 Database'}
             {currentTab === 'blacklist' && '演员黑名单 Actor Blacklist'}
