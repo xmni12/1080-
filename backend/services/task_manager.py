@@ -173,13 +173,14 @@ class TaskManager:
             try:
                 # 异步触发 WebSocket 推送，不阻塞同步的爬虫逻辑
                 loop = asyncio.get_running_loop()
-                if explicit_level:
-                    level = explicit_level
-                else:
-                    level = "info"
+                
+                level = explicit_level if explicit_level else "info"
+                
+                # 如果传入的是默认的 info，但信息里包含敏感词，则强行升级日志级别
+                if level == "info":
                     if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
-                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
+                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
                 
                 loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except Exception as e:
@@ -422,5 +423,222 @@ class TaskManager:
                 ws_log("⏹ 沙盒漫游任务彻底结束。")
             except:
                 pass
+
+    async def run_completion_search(self, codes: list[str]):
+        """
+        女优补全计划：带着缺失番号列表前往论坛进行逐个搜索并下载
+        """
+        def ws_log(msg: str, explicit_level: str = None):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = explicit_level if explicit_level else "info"
+                if level == "info":
+                    if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                    elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
+                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'completion' in self.active_pages:
+            ws_log("❌ 补全搜索任务已经在运行中，请勿重复启动。", explicit_level="error")
+            return
+
+        ws_log(f"🚀 女优补全计划正式启动！收到 {len(codes)} 个缺失番号清单，准备切入论坛主动检索模式...")
+        
+        config = load_config()
+        hide_browser = config.get("hide_browser", False)
+        
+        co = ChromiumOptions().set_local_port(9222)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        if hide_browser: 
+            ws_log("已开启无头静默模式运行。")
+            co.set_argument('--window-position=-32000,-32000')
+            
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            if hide_browser:
+                try: page.set.window.hide()
+                except: pass
+            
+            self.active_pages['completion'] = page
+            ws_log("✅ DrissionPage 浏览器内核启动成功。")
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动失败: {e}", explicit_level="error")
+            return
+            
+        try:
+            # 实例化一个临时的 Spider Service 以复用其下载附件的底层能力
+            spider = DiscuzSpiderService(page=page, log_callback=ws_log)
+            
+            for i, code in enumerate(codes):
+                if self.stop_requested or self.stop_lab_requested:
+                    ws_log("🛑 补全计划被强制终止。")
+                    break
+                    
+                ws_log(f"🔍 正在执行第 {i+1}/{len(codes)} 个目标搜索：{code}")
+                
+                # 访问搜索页面
+                search_url = f"https://x999x.me/search.php?mod=forum&srchtxt={code}&searchsubmit=yes"
+                page.get(search_url)
+                
+                # 随机延迟，不仅防盾，还要规避论坛“15秒内不能连续搜索”的限制
+                await asyncio.sleep(random.uniform(16.0, 20.0))
+                
+                page_title = page.title or ""
+                page_html = page.html or ""
+                
+                if "Just a moment" in page_title or "Cloudflare" in page_title:
+                    ws_log(f"❌ 搜刮 {code} 时遭遇 CF 盾拦截，暂缓执行。", explicit_level="error")
+                    continue
+                    
+                if "抱歉，您在" in page_html and "秒内只能进行一次搜索" in page_html:
+                    ws_log(f"⏳ 触发论坛搜索频率限制，退避等待 20 秒...", explicit_level="warn")
+                    await asyncio.sleep(20)
+                    page.get(search_url)
+                    await asyncio.sleep(random.uniform(5.0, 8.0))
+                    page_html = page.html or ""
+                
+                if "抱歉，没有找到匹配结果" in page_html:
+                    ws_log(f"🚧 [{code}] 论坛内暂无资源，标记为缺失。", explicit_level="warn")
+                    continue
+                    
+                # 提取搜索结果列表
+                # Discuz 搜索结果通常在 class="pbw" 或特定的 li/div 中
+                results = []
+                for item in page.eles('tag:li@class:pbw'):
+                    try:
+                        title_a = item.ele('tag:h3').ele('tag:a')
+                        title_text = title_a.text
+                        href = title_a.attr('href')
+                        
+                        # 找到版块名称
+                        forum_a = item.ele('tag:p').eles('tag:a')[1] # 通常第二个a标签是版块名
+                        forum_name = forum_a.text if forum_a else ""
+                        
+                        results.append({
+                            "title": title_text,
+                            "href": href,
+                            "forum": forum_name
+                        })
+                    except:
+                        pass
+                
+                if not results:
+                    # 尝试其他可能的 DOM 结构
+                    for item in page.eles('tag:h3'):
+                        try:
+                            title_a = item.ele('tag:a')
+                            if not title_a: continue
+                            href = title_a.attr('href')
+                            if 'tid=' not in href and 'thread-' not in href: continue
+                            
+                            title_text = title_a.text
+                            # 粗略提取版块名（如果没有明确的标签，就当作未知）
+                            results.append({
+                                "title": title_text,
+                                "href": href,
+                                "forum": "未知"
+                            })
+                        except: pass
+
+                if not results:
+                    ws_log(f"🚧 [{code}] 未解析到有效的搜索结果条目。", explicit_level="warn")
+                    continue
+                    
+                # 优先级排序: 4K超清 > VR視頻 > 高清有碼 > 其他
+                target_result = None
+                
+                for res in results:
+                    forum = res["forum"]
+                    title = res["title"]
+                    # 必须确认标题真的包含目标番号，防止论坛搜索引擎瞎匹配
+                    if code.upper() not in title.upper():
+                        continue
+                        
+                    if "4K" in forum or "4K" in title.upper():
+                        target_result = res
+                        target_result["section"] = "4k"
+                        break # 找到了最高优先级，直接选定
+                        
+                if not target_result:
+                    for res in results:
+                        forum = res["forum"]
+                        title = res["title"]
+                        if code.upper() not in title.upper(): continue
+                        if "VR" in forum or "VR" in title.upper():
+                            target_result = res
+                            target_result["section"] = "vr"
+                            break
+                            
+                if not target_result:
+                    for res in results:
+                        forum = res["forum"]
+                        title = res["title"]
+                        if code.upper() not in title.upper(): continue
+                        if "高清" in forum or "有碼" in forum or "HD" in title.upper():
+                            target_result = res
+                            target_result["section"] = "hd"
+                            break
+
+                if not target_result:
+                    # 随便选一个包含番号的
+                    for res in results:
+                        if code.upper() in res["title"].upper():
+                            target_result = res
+                            target_result["section"] = "hd" # 默认归入 hd
+                            break
+                            
+                if not target_result:
+                    ws_log(f"🚧 [{code}] 搜索结果中没有完全匹配的标题，安全跳过。", explicit_level="warn")
+                    continue
+                    
+                # 开始执行下载
+                section_key = target_result["section"]
+                target_url = target_result["href"]
+                target_title = target_result["title"]
+                
+                section_config = config.get("sections", {}).get(section_key, {})
+                save_path = section_config.get("save_path", f"./downloads/{section_key}")
+                
+                ws_log(f"🎯 成功锁定 [{code}] 目标资源 (判为 {section_key} 级): {target_title[:20]}...")
+                
+                # 借用 spider_service 的 _download_attachments
+                # 因为补全计划肯定是白名单级别的女优，所以可以直接放进 whitelist_save_path (如果配置了的话)
+                wl_save_path = section_config.get('whitelist_save_path', '').strip()
+                if wl_save_path:
+                    final_save_path = wl_save_path
+                else:
+                    final_save_path = os.path.join(save_path, "精选演员")
+                    
+                if not os.path.exists(final_save_path):
+                    os.makedirs(final_save_path)
+                
+                # 执行纯代码静默下载
+                dl_res = await spider._download_attachments(target_url, code, final_save_path, section_config)
+                
+                if dl_res == "SUCCESS":
+                    # 入库
+                    async with AsyncSessionLocal() as session:
+                        await spider.save_record(session, section_key, code, target_title, target_url)
+                    ws_log(f"✅ [{code}] 补全下载成功，已归档入库！", explicit_level="success")
+                elif dl_res == "QUOTA_LIMIT":
+                    ws_log("！！！触发论坛配额限制，补全计划被迫终止！！！", explicit_level="error")
+                    break
+                else:
+                    ws_log(f"❌ [{code}] 补全下载失败，原因码: {dl_res}", explicit_level="error")
+                    
+        except Exception as e:
+            ws_log(f"❌ 补全搜索任务出现异常: {e}", explicit_level="error")
+        finally:
+            if 'completion' in self.active_pages:
+                del self.active_pages['completion']
+            try:
+                page.quit()
+            except:
+                pass
+            ws_log("✅ 补全计划所有扫描流程执行完毕。浏览器资源已释放。", explicit_level="success")
 
 task_manager = TaskManager()

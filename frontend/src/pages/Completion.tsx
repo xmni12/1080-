@@ -1,36 +1,45 @@
 import { useState } from 'react';
 import { Rocket, Link as LinkIcon, ShieldCheck, Film, PlayCircle, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
-// import axios from 'axios'; // We'll need this when backend is ready
+import axios from 'axios';
 
 export function Completion() {
   const [avbaseUrl, setAvbaseUrl] = useState('https://www.avbase.net/talents/%E7%B3%B8%E4%BA%95%E7%91%A0%E8%8A%B1');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  // 模拟的进度与对账数据
+  // 进度与对账数据
   const [syncStatus, setSyncStatus] = useState<any>(null);
 
-  const handleStartSync = () => {
+  const handleStartSync = async () => {
     if (!avbaseUrl.trim()) return;
     setIsSyncing(true);
     
-    // 模拟数据对账过程
-    setTimeout(() => {
-        setSyncStatus({
-            actor: '糸井瑠花',
-            total_works: 50,
-            emby_owned: 32,
-            missing: 18,
-            missing_codes: ['OFJE-632', 'SSNI-999', 'STARS-111']
-        });
-        setIsSyncing(false);
-    }, 1500);
+    try {
+      const res = await axios.post('http://127.0.0.1:8000/api/tasks/completion/sync', { url: avbaseUrl });
+      setSyncStatus(res.data);
+    } catch (error) {
+      console.error('Failed to sync completion', error);
+      alert('对账失败，请检查网络或后端的 Emby 与 AVBase 服务连通性。');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const handleStartSearch = () => {
+  const handleStartSearch = async () => {
+    if (!syncStatus || syncStatus.missing_items.length === 0) return;
     setIsSearching(true);
-    // 模拟启动搜刮
+    
+    try {
+      const codes = syncStatus.missing_items.map((item: any) => item.code);
+      await axios.post('http://127.0.0.1:8000/api/tasks/completion/search', { codes });
+      alert('补全搜索任务已推送到后台执行，请关注调度中心和日志控制台！');
+    } catch (error) {
+      console.error('Failed to start search', error);
+      alert('启动搜刮任务失败。');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -90,11 +99,11 @@ export function Completion() {
             </h4>
             <button 
                 onClick={handleStartSearch}
-                disabled={isSearching}
+                disabled={isSearching || syncStatus.missing === 0}
                 className="flex items-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-5 py-2.5 rounded-lg font-bold transition-colors shadow-md shadow-fuchsia-500/20 disabled:opacity-50"
             >
                 {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                立即前往论坛搜刮缺失拼图
+                {syncStatus.missing > 0 ? "立即前往论坛搜刮缺失拼图" : "已全收集，无需搜刮"}
             </button>
         </div>
 
@@ -114,21 +123,27 @@ export function Completion() {
         </div>
 
         {/* 缺失番号展示区 */}
+        {syncStatus.missing > 0 && (
         <div>
             <h5 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
-                <Film className="w-4 h-4" /> 目标搜刮清单 (Top 3)
+                <Film className="w-4 h-4" /> 目标搜刮清单 (点击可前往 AVBase 查阅详情)
             </h5>
-            <div className="flex flex-wrap gap-2">
-                {syncStatus.missing_codes.map((code: string) => (
-                    <span key={code} className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-sm font-bold font-mono shadow-sm">
-                        {code}
-                    </span>
+            <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto p-2 border border-slate-100 rounded-xl bg-slate-50/50">
+                {syncStatus.missing_items.map((item: any) => (
+                    <a 
+                      key={item.code} 
+                      href={item.avbase_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-fuchsia-600 hover:border-fuchsia-300 rounded-md text-sm font-bold font-mono shadow-sm transition-colors"
+                      title="点击前往 AVBase 查看作品详情"
+                    >
+                        {item.code}
+                    </a>
                 ))}
-                <span className="px-3 py-1.5 bg-transparent border border-dashed border-slate-300 text-slate-400 rounded-md text-sm font-bold">
-                    ...及其他 {syncStatus.missing - 3} 部
-                </span>
             </div>
         </div>
+        )}
       </div>
       )}
 
@@ -138,7 +153,7 @@ export function Completion() {
            <span className="text-sm font-bold text-slate-300">搜刮实况追踪列车</span>
         </div>
         <div className="p-4 font-mono text-sm text-slate-500 flex items-center justify-center h-full">
-            {isSearching ? "搜刮雷达扫描中..." : "等待启动搜刮任务..."}
+            {isSearching ? "搜刮指令已下达，请前往【任务中心】底部的日志雷达监控实况..." : "等待启动搜刮任务..."}
         </div>
       </div>
 

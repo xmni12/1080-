@@ -44,6 +44,7 @@ class SectionSettings(BaseModel):
     start_page: int = 1
     history_page: int = 1
     save_path: str = ""
+    whitelist_save_path: Optional[str] = ""
     timer_enabled: bool = False
     timer_time: str = "03:00"
     simulate_human: bool = True
@@ -101,3 +102,9 @@ class PaginatedWhitelistResponse(BaseModel):
 
 class AddWhitelistRequest(BaseModel):
     names: str
+
+class SyncCompletionRequest(BaseModel):
+    url: str
+
+class SearchCompletionRequest(BaseModel):
+    codes: List[str]

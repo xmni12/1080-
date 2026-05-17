@@ -63,4 +63,46 @@ class AvbaseClient:
             logger.error(f"AVBase search exception for {code}: {e}")
             return []
 
+    async def get_works_by_talent_url(self, talent_url: str):
+        """
+        获取演员主页下的所有作品番号及链接
+        """
+        try:
+            await asyncio.sleep(random.uniform(1.0, 2.5))
+            
+            async with CurlAsyncSession(impersonate='chrome120', timeout=20.0) as client:
+                resp = await client.get(talent_url)
+                
+                if resp.status_code != 200:
+                    logger.warning(f"AVBase talent fetch failed for {talent_url}: HTTP {resp.status_code}")
+                    return {"actor_name": "未知演员", "works": []}
+
+                html_text = resp.text
+                
+                import urllib.parse
+                # Extract talent name from URL
+                match = re.search(r'/talents/([^/]+)', talent_url)
+                actor_name = urllib.parse.unquote(match.group(1)) if match else "未知演员"
+                
+                # Extract works
+                pattern = r'href=["\'](/works/([A-Za-z0-9]+-[A-Za-z0-9]+))["\']'
+                matches = re.findall(pattern, html_text)
+                
+                works = []
+                seen = set()
+                for href, code in matches:
+                    code = code.upper()
+                    if code not in seen:
+                        seen.add(code)
+                        works.append({
+                            "code": code,
+                            "avbase_url": f"https://www.avbase.net{href}"
+                        })
+                        
+                return {"actor_name": actor_name, "works": works}
+
+        except Exception as e:
+            logger.error(f"AVBase talent fetch exception: {e}")
+            return {"actor_name": "未知演员", "works": []}
+
 avbase_client = AvbaseClient()
