@@ -80,24 +80,36 @@ class AvbaseClient:
                 html_text = resp.text
                 
                 import urllib.parse
+                from bs4 import BeautifulSoup
+                from core.utils import extract_code
+                
                 # Extract talent name from URL
                 match = re.search(r'/talents/([^/]+)', talent_url)
                 actor_name = urllib.parse.unquote(match.group(1)) if match else "未知演员"
                 
-                # Extract works
-                pattern = r'href=["\'](/works/([A-Za-z0-9]+-[A-Za-z0-9]+))["\']'
-                matches = re.findall(pattern, html_text)
+                # Parse HTML to specifically target the primary work titles, ignoring thumbnail sections
+                soup = BeautifulSoup(html_text, 'lxml')
+                title_links = soup.select('a.text-md.font-bold')
                 
                 works = []
                 seen = set()
-                for href, code in matches:
-                    code = code.upper()
-                    if code not in seen:
-                        seen.add(code)
-                        works.append({
-                            "code": code,
-                            "avbase_url": f"https://www.avbase.net{href}"
-                        })
+                
+                for a in title_links:
+                    href = a.get('href')
+                    if href and '/works/' in href:
+                        raw_code = href.split('/')[-1]
+                        # AVBase sometimes prefixes codes with studio names (e.g., LEO:UMD-1010)
+                        # We use our global extract_code to get the clean standard code
+                        clean_code = extract_code(raw_code)
+                        if not clean_code:
+                            clean_code = extract_code(raw_code.split(':')[-1]) if ':' in raw_code else raw_code.upper()
+                            
+                        if clean_code and clean_code not in seen:
+                            seen.add(clean_code)
+                            works.append({
+                                "code": clean_code,
+                                "avbase_url": f"https://www.avbase.net{href}"
+                            })
                         
                 return {"actor_name": actor_name, "works": works}
 
