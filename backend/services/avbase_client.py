@@ -65,53 +65,75 @@ class AvbaseClient:
 
     async def get_works_by_talent_url(self, talent_url: str):
         """
-        获取演员主页下的所有作品番号及链接
+        获取演员主页下的所有作品番号及链接 (支持跨越多页的全量抓取)
         """
         try:
-            await asyncio.sleep(random.uniform(1.0, 2.5))
+            import urllib.parse
+            from bs4 import BeautifulSoup
+            from core.utils import extract_code
+            
+            # Extract talent name from URL
+            match = re.search(r'/talents/([^/]+)', talent_url)
+            actor_name = urllib.parse.unquote(match.group(1)) if match else "未知演员"
+            
+            works = []
+            seen = set()
+            max_page = 1
+            current_page = 1
             
             async with CurlAsyncSession(impersonate='chrome120', timeout=20.0) as client:
-                resp = await client.get(talent_url)
-                
-                if resp.status_code != 200:
-                    logger.warning(f"AVBase talent fetch failed for {talent_url}: HTTP {resp.status_code}")
-                    return {"actor_name": "未知演员", "works": []}
+                while current_page <= max_page:
+                    await asyncio.sleep(random.uniform(1.0, 2.5))
+                    
+                    page_url = f"{talent_url}?page={current_page}" if current_page > 1 else talent_url
+                    logger.info(f"AVBase fetching {actor_name} works page {current_page} / {max_page}...")
+                    
+                    resp = await client.get(page_url)
+                    
+                    if resp.status_code != 200:
+                        logger.warning(f"AVBase talent fetch failed for {page_url}: HTTP {resp.status_code}")
+                        break
 
-                html_text = resp.text
-                
-                import urllib.parse
-                from bs4 import BeautifulSoup
-                from core.utils import extract_code
-                
-                # Extract talent name from URL
-                match = re.search(r'/talents/([^/]+)', talent_url)
-                actor_name = urllib.parse.unquote(match.group(1)) if match else "未知演员"
-                
-                # Parse HTML to specifically target the primary work titles, ignoring thumbnail sections
-                soup = BeautifulSoup(html_text, 'lxml')
-                title_links = soup.select('a.text-md.font-bold')
-                
-                works = []
-                seen = set()
-                
-                for a in title_links:
-                    href = a.get('href')
-                    if href and '/works/' in href:
-                        raw_code = href.split('/')[-1]
-                        # AVBase sometimes prefixes codes with studio names (e.g., LEO:UMD-1010)
-                        # We use our global extract_code to get the clean standard code
-                        clean_code = extract_code(raw_code)
-                        if not clean_code:
-                            clean_code = extract_code(raw_code.split(':')[-1]) if ':' in raw_code else raw_code.upper()
-                            
-                        if clean_code and clean_code not in seen:
-                            seen.add(clean_code)
-                            works.append({
-                                "code": clean_code,
-                                "avbase_url": f"https://www.avbase.net{href}"
-                            })
+                    html_text = resp.text
+                    soup = BeautifulSoup(html_text, 'lxml')
+                    
+                    # 第一页时，解析底部分页组件，找出最大页码
+                    if current_page == 1:
+                        pagination_links = soup.find_all('a', href=re.compile(r'page=\d+'))
+                        for a in pagination_links:
+                            href = a.get('href', '')
+                            m = re.search(r'page=(\d+)', href)
+                            if m:
+                                p_num = int(m.group(1))
+                                if p_num > max_page:
+                                    max_page = p_num
+                    
+                    title_links = soup.select('a.text-md.font-bold')
+                    
+                    page_works_count = 0
+                    for a in title_links:
+                        href = a.get('href')
+                        if href and '/works/' in href:
+                            raw_code = href.split('/')[-1]
+                            clean_code = extract_code(raw_code)
+                            if not clean_code:
+                                clean_code = extract_code(raw_code.split(':')[-1]) if ':' in raw_code else raw_code.upper()
+                                
+                            if clean_code and clean_code not in seen:
+                                seen.add(clean_code)
+                                works.append({
+                                    "code": clean_code,
+                                    "avbase_url": f"https://www.avbase.net{href}"
+                                })
+                                page_works_count += 1
+                                
+                    # 如果当前页没有解析到任何新作品，可能到底了
+                    if page_works_count == 0:
+                        break
                         
-                return {"actor_name": actor_name, "works": works}
+                    current_page += 1
+                    
+            return {"actor_name": actor_name, "works": works}
 
         except Exception as e:
             logger.error(f"AVBase talent fetch exception: {e}")
