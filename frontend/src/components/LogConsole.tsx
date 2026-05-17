@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LogMessage } from '../hooks/useLogs';
 import { clsx } from 'clsx';
-import { Terminal, Trash2 } from 'lucide-react';
+import { Terminal, Trash2, Search } from 'lucide-react';
 
 interface LogConsoleProps {
   logs: LogMessage[];
@@ -14,13 +14,22 @@ type FilterType = 'all' | 'error' | 'success' | 'warn';
 export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
   const endOfLogsRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 自动滚动到底部
   useEffect(() => {
     endOfLogsRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs, filter]);
+  }, [logs, filter, searchQuery]);
 
   const filteredLogs = logs.filter(log => {
+    // 文本雷达搜索
+    if (searchQuery.trim() !== '') {
+      if (!log.content.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+    }
+    
+    // 状态过滤
     if (filter === 'all') return true;
     if (filter === 'error') return log.level === 'error';
     if (filter === 'success') return log.level === 'success';
@@ -31,14 +40,29 @@ export function LogConsole({ logs, onClear, isConnected }: LogConsoleProps) {
   return (
     <div className="flex flex-col bg-[#1e1e1e] rounded-xl overflow-hidden shadow-lg border border-slate-700 h-[500px]">
       <div className="flex items-center justify-between px-4 py-3 bg-[#2d2d2d] border-b border-slate-700">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-slate-400" />
-          <span className="text-sm font-medium text-slate-300">实时任务日志控制台</span>
-          <span className={clsx(
-            "ml-2 w-2 h-2 rounded-full",
-            isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
-          )}></span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-slate-400" />
+            <span className="text-sm font-medium text-slate-300">实时任务日志控制台</span>
+            <span className={clsx(
+              "w-2 h-2 rounded-full",
+              isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+            )}></span>
+          </div>
+          
+          {/* 日志雷达搜索框 */}
+          <div className="relative flex items-center ml-4">
+            <Search className="absolute left-2.5 w-3.5 h-3.5 text-slate-500" />
+            <input 
+              type="text"
+              placeholder="雷达搜索 (例如 HTM-108)..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-8 pr-3 py-1 text-xs bg-[#1e1e1e] text-slate-300 border border-slate-600 rounded-md outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-56 placeholder-slate-600"
+            />
+          </div>
         </div>
+        
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-[#1e1e1e] rounded-lg p-1 border border-slate-600">
             <button
