@@ -51,7 +51,8 @@ async def delete_failed_records(request: DeleteRequest, db: AsyncSession = Depen
 async def retry_failed_records(request: DeleteRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     重试失败的记录
-    获取指定的失败记录，将其重新加入到爬虫队列中，然后从失败列表中删除
+    获取指定的失败记录，触发该版块的爬虫。
+    爬虫只有在真正成功入库后，才会从失败列表中清理掉这些记录。
     """
     if not request.ids:
         return {"status": "success", "retried": 0}
@@ -70,9 +71,7 @@ async def retry_failed_records(request: DeleteRequest, background_tasks: Backgro
     for section in sections_to_run:
         background_tasks.add_task(task_manager.run_discuz_spider, section, "archive", True)
         
-    # Delete from failed records
-    del_stmt = delete(FailedRecord).where(FailedRecord.id.in_(request.ids))
-    await db.execute(del_stmt)
-    await db.commit()
+    # 我们不再主动删除这些失败记录。
+    # spider_service.py 在判断下载成功时，会顺手将对应的 FailedRecord 抹除。
     
     return {"status": "success", "retried": retried_count}

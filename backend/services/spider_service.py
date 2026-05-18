@@ -287,6 +287,15 @@ class DiscuzSpiderService:
                                     downloaded_count += 1
                                     downloaded_codes.add(code)
                                     await self.save_record(session, section_key, code, title, post_url)
+                                    
+                                    # 如果该番号在死链回收站中，说明抢救成功，应将其移除
+                                    fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                                    fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                                    if fail_record:
+                                        await session.delete(fail_record)
+                                        await session.commit()
+                                        self._log(f"🚑 [{code}] 死链抢救成功！已从回收站中移除。", level="success")
+                                        
                                 msg = f"✅ [{code}] 成功入库" + (" (画质已升档)" if is_upgrade else "")
                                 self._log(msg)
                             elif result == "QUOTA_LIMIT":
