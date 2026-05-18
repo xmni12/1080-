@@ -108,3 +108,17 @@ class SyncCompletionRequest(BaseModel):
 
 class SearchCompletionRequest(BaseModel):
     codes: List[str]
+
+class TitleBlocklistResponse(BaseModel):
+    id: int
+    keyword: str
+    added_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedTitleBlocklistResponse(BaseModel):
+    total: int
+    items: List[TitleBlocklistResponse]
+
+class AddTitleBlocklistRequest(BaseModel):
+    keywords: str

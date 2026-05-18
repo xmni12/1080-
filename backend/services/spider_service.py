@@ -9,7 +9,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from DrissionPage import ChromiumPage
 
-from backend.models import DownloadRecord, BlacklistActor, WhitelistActor, FailedRecord
+from backend.models import DownloadRecord, BlacklistActor, WhitelistActor, FailedRecord, TitleBlocklist
 from backend.services.avbase_client import avbase_client
 from core.utils import extract_code
 
@@ -192,6 +192,16 @@ class DiscuzSpiderService:
                             return
                         
                         task_save_path = save_path
+                        
+                        # --- 标题前置斩杀线 (Title Blocklist) ---
+                        async with db_lock:
+                            tb_stmt = select(TitleBlocklist)
+                            tb_all = (await session.execute(tb_stmt)).scalars().all()
+                            
+                            for tb in tb_all:
+                                if tb.keyword.lower() in title.lower():
+                                    self._log(f"🚧 [{code}] 命中标题屏蔽词 [{tb.keyword}]，已直接丢弃！", level="warn")
+                                    return
                         
                         # --- AVBase 智能多维演员滤网 (A+B方案) ---
                         actors_info = await avbase_client.get_actors_by_code(code)

@@ -8,6 +8,7 @@ import { Blacklist } from './pages/Blacklist';
 import { Whitelist } from './pages/Whitelist';
 import { FailedRecords } from './pages/FailedRecords';
 import { Completion } from './pages/Completion';
+import { TitleBlocklist } from './pages/TitleBlocklist';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -19,6 +20,7 @@ function App() {
       {currentTab === 'completion' && <Completion />}
       {currentTab === 'failed_records' && <FailedRecords />}
       {currentTab === 'database' && <Database />}
+      {currentTab === 'title_blocklist' && <TitleBlocklist />}
       {currentTab === 'blacklist' && <Blacklist />}
       {currentTab === 'whitelist' && <Whitelist />}
       {currentTab === 'settings' && <Settings />}

@@ -48,8 +48,15 @@ class FailedRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     section: Mapped[str] = mapped_column(String(100), index=True, comment="版块名称")
-    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, comment="番号")
+    code: Mapped[str] = mapped_column(String(100), unique=True, index=True, comment="番号/唯一标识")
     title: Mapped[str] = mapped_column(String(255), comment="帖子标题")
     post_url: Mapped[str] = mapped_column(String(255), comment="帖子链接")
     reason: Mapped[str] = mapped_column(String(500), comment="失败原因")
     failed_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="失败时间")
+
+class TitleBlocklist(Base):
+    __tablename__ = "title_blocklist"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    keyword: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="屏蔽关键词")
+    added_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="添加时间")

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import records, tasks, websocket, settings, blacklist, whitelist, failed_records
+from backend.routers import records, tasks, websocket, settings, blacklist, whitelist, failed_records, title_blocklist
 from backend.database import engine, Base
 from backend.services.scheduler_service import scheduler_service
 from backend.services.task_manager import task_manager
@@ -45,6 +45,7 @@ app.include_router(settings.router)
 app.include_router(blacklist.router)
 app.include_router(whitelist.router)
 app.include_router(failed_records.router)
+app.include_router(title_blocklist.router)
 
 @app.get("/")
 async def read_root():
