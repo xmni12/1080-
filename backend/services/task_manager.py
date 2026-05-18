@@ -203,6 +203,9 @@ class TaskManager:
             section_config['url'] = default_urls.get(section_key, '')
 
         co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
         # 持久化用户数据，完美对抗 CF 盾
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
@@ -263,6 +266,9 @@ class TaskManager:
 
         ws_log("▶ 开始初始化独立的绿卡获取任务 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
         
@@ -332,6 +338,9 @@ class TaskManager:
 
         ws_log("▶ 开始初始化独立的账号登录授权通道 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
         
@@ -388,6 +397,9 @@ class TaskManager:
 
         ws_log("▶ 开始初始化零干预自由沙盒浏览器 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
         
@@ -450,6 +462,9 @@ class TaskManager:
         hide_browser = config.get("hide_browser", False)
         
         co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
         co.set_user_data_path(profile_path)
         

@@ -55,6 +55,7 @@ class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
     spider_threads: int = 1
+    browser_path: Optional[str] = ""
 
 class BlacklistActorResponse(BaseModel):
     id: int

@@ -123,6 +123,16 @@ export function Settings() {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">白名单单人专属保存路径 (留空则存入子目录)</label>
+              <input 
+                type="text" 
+                value={config.sections[section]?.whitelist_save_path || ''}
+                onChange={e => updateSection(section, 'whitelist_save_path', e.target.value)}
+                placeholder="例如: E:\Favorites (留空则默认保存在上面的路径\Favorites中)"
+                className="w-full px-3 py-2 bg-emerald-50/50 border border-emerald-200 rounded-lg outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
             <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2">
               <input 
                 type="checkbox" 
@@ -169,6 +179,16 @@ export function Settings() {
             高级参数
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">自定义浏览器内核路径 (Browser Path)</label>
+              <input 
+                type="text" 
+                value={config.browser_path || ''}
+                onChange={e => setConfig({ ...config, browser_path: e.target.value })}
+                placeholder="例如 Edge: C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe (留空则自动检测)"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
             <div className="space-y-2 flex items-center gap-3">
                 <input 
                   type="checkbox" 

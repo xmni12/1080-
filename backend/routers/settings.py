@@ -15,6 +15,7 @@ async def get_settings():
     sections = {}
     hide_browser = config.get("hide_browser", False)
     spider_threads = config.get("spider_threads", 1)
+    browser_path = config.get("browser_path", "")
     
     for key, value in config.items():
         if isinstance(value, dict) and key != "sections":
@@ -26,7 +27,8 @@ async def get_settings():
     return GlobalSettings(
         sections=sections,
         hide_browser=hide_browser,
-        spider_threads=spider_threads
+        spider_threads=spider_threads,
+        browser_path=browser_path
     )
 
 @router.post("")
@@ -41,6 +43,7 @@ async def update_settings(settings: GlobalSettings):
         
     config_data["hide_browser"] = settings.hide_browser
     config_data["spider_threads"] = settings.spider_threads
+    config_data["browser_path"] = settings.browser_path
     
     save_config(config_data)
     
