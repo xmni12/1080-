@@ -396,6 +396,7 @@ class TaskManager:
             return
 
         ws_log("▶ 开始初始化零干预自由沙盒浏览器 (强制有头模式)...")
+        config = load_config()
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
         if browser_path:
