@@ -780,7 +780,7 @@ class TaskManager:
                         fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
                         if fail_record:
                             fail_record.reason = f"{dl_res} (重试失败)"
-                            fail_record.failed_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                            fail_record.failed_time = datetime.now()
                             await session.commit()
                             
         except Exception as e:
