@@ -51,8 +51,7 @@ async def delete_failed_records(request: DeleteRequest, db: AsyncSession = Depen
 async def retry_failed_records(request: DeleteRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     重试失败的记录
-    获取指定的失败记录，触发该版块的爬虫。
-    爬虫只有在真正成功入库后，才会从失败列表中清理掉这些记录。
+    获取指定的失败记录，直接进行点对点的精准重新下载。
     """
     if not request.ids:
         return {"status": "success", "retried": 0}
@@ -61,17 +60,20 @@ async def retry_failed_records(request: DeleteRequest, background_tasks: Backgro
     result = await db.execute(stmt)
     records = result.scalars().all()
     
-    retried_count = 0
-    # Group by section
-    sections_to_run = set()
-    for record in records:
-        sections_to_run.add(record.section)
-        retried_count += 1
+    if not records:
+        return {"status": "success", "retried": 0}
         
-    for section in sections_to_run:
-        background_tasks.add_task(task_manager.run_discuz_spider, section, "archive", True)
+    records_data = []
+    for r in records:
+        records_data.append({
+            "id": r.id,
+            "section": r.section,
+            "code": r.code,
+            "title": r.title,
+            "post_url": r.post_url
+        })
         
-    # 我们不再主动删除这些失败记录。
-    # spider_service.py 在判断下载成功时，会顺手将对应的 FailedRecord 抹除。
+    # 将打包好的死链数据交给 task_manager 进行定点爆破
+    background_tasks.add_task(task_manager.run_retry_tasks, records_data)
     
-    return {"status": "success", "retried": retried_count}
+    return {"status": "success", "retried": len(records_data)}

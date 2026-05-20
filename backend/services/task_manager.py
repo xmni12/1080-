@@ -657,4 +657,140 @@ class TaskManager:
                 pass
             ws_log("✅ 补全计划所有扫描流程执行完毕。浏览器资源已释放。", explicit_level="success")
 
+    async def run_retry_tasks(self, records: list[dict]):
+        """
+        死链精准抢救任务：直接跳转原帖进行重新下载
+        """
+        def ws_log(msg: str, explicit_level: str = None):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = explicit_level if explicit_level else "info"
+                if level == "info":
+                    if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                    elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
+                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'retry' in self.active_pages:
+            ws_log("❌ 死链抢救任务已经在运行中，请勿重复启动。", explicit_level="error")
+            return
+
+        ws_log(f"🚑 死链抢救特遣队出发！收到 {len(records)} 个抢救目标，准备执行定点爆破...")
+        
+        config = load_config()
+        hide_browser = config.get("hide_browser", False)
+        
+        co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path:
+            co.set_browser_path(browser_path)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        if hide_browser: 
+            ws_log("已开启无头静默模式运行。")
+            co.set_argument('--window-position=-32000,-32000')
+            
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            if hide_browser:
+                try: page.set.window.hide()
+                except: pass
+            
+            self.active_pages['retry'] = page
+            ws_log("✅ DrissionPage 浏览器内核启动成功。")
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动失败: {e}", explicit_level="error")
+            return
+            
+        try:
+            spider = DiscuzSpiderService(page=page, log_callback=ws_log)
+            from backend.services.avbase_client import avbase_client
+            from sqlalchemy import select
+            from backend.models import WhitelistActor, FailedRecord
+            
+            for i, record in enumerate(records):
+                if self.stop_requested or self.stop_lab_requested:
+                    ws_log("🛑 抢救计划被强制终止。")
+                    break
+                    
+                code = record["code"]
+                target_url = record["post_url"]
+                section_key = record["section"]
+                title = record["title"]
+                
+                ws_log(f"🔍 正在执行第 {i+1}/{len(records)} 个抢救目标：[{code}]")
+                
+                section_config = config.get("sections", {}).get(section_key, {})
+                save_path = section_config.get("save_path", f"./downloads/{section_key}")
+                
+                # 为了确保能存入白名单文件夹，这里需要再次查一次纯净度
+                task_save_path = save_path
+                actors_info = await avbase_client.get_actors_by_code(code)
+                if actors_info:
+                    actor_names = [a["name"] for a in actors_info]
+                    async with AsyncSessionLocal() as session:
+                        wl_stmt = select(WhitelistActor)
+                        wl_all = (await session.execute(wl_stmt)).scalars().all()
+                        
+                        covered_actor_names = set()
+                        for wl in wl_all:
+                            wl_aliases = [n.strip() for n in wl.aliases.split(',')] if wl.aliases else []
+                            wl_names_set = set([wl.name] + wl_aliases)
+                            matching_names = wl_names_set.intersection(set(actor_names))
+                            if matching_names:
+                                covered_actor_names.update(matching_names)
+                                
+                        if len(covered_actor_names) == len(actor_names) and len(actor_names) > 0:
+                            wl_save_path = section_config.get('whitelist_save_path', '').strip()
+                            if wl_save_path:
+                                task_save_path = wl_save_path
+                            else:
+                                task_save_path = os.path.join(save_path, "精选演员")
+                                
+                if not os.path.exists(task_save_path):
+                    os.makedirs(task_save_path)
+                    
+                # 随机延迟，模拟人类操作防封锁
+                await asyncio.sleep(random.uniform(5.0, 10.0))
+                
+                # 直接执行定点下载
+                dl_res = await spider._download_attachments(target_url, code, task_save_path, section_config)
+                
+                async with AsyncSessionLocal() as session:
+                    if dl_res == "SUCCESS":
+                        await spider.save_record(session, section_key, code, title, target_url)
+                        # 删除旧的失败记录
+                        fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                        fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                        if fail_record:
+                            await session.delete(fail_record)
+                            await session.commit()
+                        ws_log(f"✅ 🚑 [{code}] 抢救成功！附件已入库，已从回收站中移除。", explicit_level="success")
+                    elif dl_res == "QUOTA_LIMIT":
+                        ws_log("！！！触发论坛配额限制，抢救任务被迫终止！！！", explicit_level="error")
+                        break
+                    else:
+                        ws_log(f"❌ 🚑 [{code}] 抢救依然失败，原因码: {dl_res}。记录继续保留在回收站中。", explicit_level="error")
+                        # 更新失败时间或记录（可选）
+                        fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                        fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                        if fail_record:
+                            fail_record.reason = f"{dl_res} (重试失败)"
+                            fail_record.failed_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                            await session.commit()
+                            
+        except Exception as e:
+            ws_log(f"❌ 死链抢救任务出现异常: {e}", explicit_level="error")
+        finally:
+            if 'retry' in self.active_pages:
+                del self.active_pages['retry']
+            try:
+                page.quit()
+            except:
+                pass
+            ws_log("✅ 死链抢救列车执行完毕。浏览器资源已释放。", explicit_level="success")
+
 task_manager = TaskManager()
