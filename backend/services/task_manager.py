@@ -490,7 +490,7 @@ class TaskManager:
             spider = DiscuzSpiderService(page=page, log_callback=ws_log)
             
             for i, code in enumerate(codes):
-                if self.stop_requested or self.stop_lab_requested:
+                if self.stop_lab_requested:
                     ws_log("🛑 补全计划被强制终止。")
                     break
                     
@@ -712,7 +712,7 @@ class TaskManager:
             from backend.models import WhitelistActor, FailedRecord
             
             for i, record in enumerate(records):
-                if self.stop_requested or self.stop_lab_requested:
+                if self.stop_lab_requested:
                     ws_log("🛑 抢救计划被强制终止。")
                     break
                     
