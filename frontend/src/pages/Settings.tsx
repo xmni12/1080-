@@ -179,15 +179,62 @@ export function Settings() {
             高级参数
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-slate-700">自定义浏览器内核路径 (Browser Path)</label>
-              <input 
-                type="text" 
-                value={config.browser_path || ''}
-                onChange={e => setConfig({ ...config, browser_path: e.target.value })}
-                placeholder="例如 Edge: C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe (留空则自动检测)"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-              />
+            <div className="space-y-3 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">浏览器内核引擎选择 (Browser Path)</label>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="browser_type"
+                    checked={!config.browser_path || config.browser_path === ''}
+                    onChange={() => setConfig({ ...config, browser_path: '' })}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-slate-600">自动检测 (默认)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="browser_type"
+                    checked={config.browser_path?.toLowerCase() === 'edge'}
+                    onChange={() => setConfig({ ...config, browser_path: 'edge' })}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-slate-600">Microsoft Edge</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="browser_type"
+                    checked={config.browser_path?.toLowerCase() === 'chrome'}
+                    onChange={() => setConfig({ ...config, browser_path: 'chrome' })}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-slate-600">Google Chrome</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="browser_type"
+                    checked={!!config.browser_path && !['edge', 'chrome', ''].includes(config.browser_path.toLowerCase())}
+                    onChange={() => setConfig({ ...config, browser_path: 'C:\\' })}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-slate-600">自定义物理路径</span>
+                </label>
+              </div>
+
+              {!!config.browser_path && !['edge', 'chrome', ''].includes(config.browser_path.toLowerCase()) && (
+                <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <input 
+                    type="text" 
+                    value={config.browser_path}
+                    onChange={e => setConfig({ ...config, browser_path: e.target.value })}
+                    placeholder="请输入可执行文件的绝对路径，例如: D:\MyBrowser\chrome.exe"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-2 flex items-center gap-3">
                 <input 

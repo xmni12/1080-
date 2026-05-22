@@ -206,6 +206,11 @@ class TaskManager:
 
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         # 持久化用户数据，完美对抗 CF 盾
@@ -269,6 +274,11 @@ class TaskManager:
         ws_log("▶ 开始初始化独立的绿卡获取任务 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
@@ -341,6 +351,11 @@ class TaskManager:
         ws_log("▶ 开始初始化独立的账号登录授权通道 (强制有头模式)...")
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
@@ -401,6 +416,11 @@ class TaskManager:
         config = load_config()
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
@@ -466,6 +486,11 @@ class TaskManager:
         
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
@@ -686,6 +711,11 @@ class TaskManager:
         
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
         if browser_path:
             co.set_browser_path(browser_path)
         profile_path = os.path.abspath('data/browser_profile')
