@@ -271,7 +271,8 @@ class TaskManager:
             ws_log("❌ 获取绿卡任务已经在运行中。")
             return
 
-        ws_log("▶ 开始初始化独立的绿卡获取任务 (强制有头模式)...")
+        ws_log("▶ 开始初始化独立的账号登录授权通道 (强制有头模式)...")
+        config = load_config()
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
         if browser_path.lower() == "edge":
@@ -349,6 +350,7 @@ class TaskManager:
             return
 
         ws_log("▶ 开始初始化独立的账号登录授权通道 (强制有头模式)...")
+        config = load_config()
         co = ChromiumOptions().set_local_port(9222)
         browser_path = config.get("browser_path", "").strip()
         if browser_path.lower() == "edge":
