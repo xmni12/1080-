@@ -52,9 +52,9 @@ export function Settings() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Backup failed', error);
-      alert('备份失败，请检查后端运行状态。');
+      alert('备份失败：' + (error.message || '未知错误'));
     }
   };
 
