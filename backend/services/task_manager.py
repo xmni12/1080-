@@ -735,6 +735,10 @@ class TaskManager:
             
             self.active_pages['retry'] = page
             ws_log("✅ DrissionPage 浏览器内核启动成功。")
+            
+            # 必须先访问一次该域名的主页，才能把该域名的持久化 Cookie 注入到 page 实例中
+            page.get("https://x999x.me/")
+            
         except Exception as e:
             ws_log(f"❌ 浏览器启动失败: {e}", explicit_level="error")
             return
