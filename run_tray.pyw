@@ -2,7 +2,6 @@ import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw
 import subprocess
-import threading
 import os
 import sys
 import webbrowser
@@ -75,24 +74,30 @@ def stop_services():
     os.system('taskkill /F /IM msedgewebview2.exe /T >nul 2>&1')
     os.system('taskkill /F /IM chrome.exe /T >nul 2>&1')
 
+def safe_notify(icon, message, title):
+    try:
+        icon.notify(message, title)
+    except:
+        pass
+
 def on_open_web(icon, item):
     webbrowser.open("http://localhost:5173")
 
 def on_restart(icon, item):
-    icon.notify("正在重启前后端引擎，请稍候...", "DiscuzSpider")
+    safe_notify(icon, "正在重启前后端引擎，请稍候...", "DiscuzSpider")
     stop_services()
     time.sleep(2)
     start_services()
-    icon.notify("引擎重启完毕！", "DiscuzSpider")
+    safe_notify(icon, "引擎重启完毕！", "DiscuzSpider")
 
 def on_exit(icon, item):
-    icon.notify("正在安全清理进程并退出系统...", "DiscuzSpider")
+    safe_notify(icon, "正在安全清理进程并退出系统...", "DiscuzSpider")
     icon.stop()
 
 def setup(icon):
     icon.visible = True
     start_services()
-    icon.notify("DiscuzSpider 已在后台隐默启动，右键点击图标控制。", "启动成功")
+    safe_notify(icon, "DiscuzSpider 已在后台隐默启动，右键点击图标控制。", "启动成功")
 
 if __name__ == '__main__':
     # 改变当前工作目录为脚本所在目录
