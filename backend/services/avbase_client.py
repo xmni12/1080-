@@ -36,14 +36,16 @@ class AvbaseClient:
                 
                 actors = []
                 seen = set()
-                
                 for a_tag in a_tags:
                     # 提取名字 (URL编码)
                     name_match = re.search(r'href=["\'][^"\']*/talents/([^"\']+)["\']', a_tag)
                     if not name_match:
                         continue
                     name = urllib.parse.unquote(name_match.group(1)).strip()
-                    
+                    # 强行截断可能附带的 ?actor_id 等参数
+                    if "?" in name:
+                        name = name.split("?")[0]
+
                     if not name or name in seen:
                         continue
                         
