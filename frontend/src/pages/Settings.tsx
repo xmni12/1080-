@@ -214,6 +214,18 @@ export function Settings() {
                 启用人类行为模拟 (防封控机制)
               </label>
             </div>
+            <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2">
+              <input 
+                type="checkbox" 
+                id={`deep_${section}`}
+                checked={config.sections[section]?.deep_identity_resolution ?? false}
+                onChange={e => updateSection(section, 'deep_identity_resolution', e.target.checked)}
+                className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 focus:ring-fuchsia-600"
+              />
+              <label htmlFor={`deep_${section}`} className="text-sm font-medium text-slate-700 cursor-pointer">
+                启用深度身份逆向解析 (遇到陌生女优自动深挖所有马甲并比对，速度较慢但 100% 不漏)
+              </label>
+            </div>
             <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2 border-t border-slate-100">
               <input 
                 type="checkbox" 

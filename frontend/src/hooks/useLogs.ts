@@ -58,7 +58,7 @@ export function useLogs(url: string, onQueueUpdate?: (data: any) => void) {
               level: data.level || 'info',
               content: data.message || event.data
             };
-            setLogs(prev => [...prev.slice(-99), newLog]);
+            setLogs(prev => [...prev.slice(-9999), newLog]);
           } catch {
             const newLog: LogMessage = {
               id: Math.random().toString(36).substring(2, 9),
@@ -66,7 +66,7 @@ export function useLogs(url: string, onQueueUpdate?: (data: any) => void) {
               level: 'info',
               content: event.data
             };
-            setLogs(prev => [...prev.slice(-99), newLog]);
+            setLogs(prev => [...prev.slice(-9999), newLog]);
           }
         };
     }).catch(e => {

@@ -50,6 +50,7 @@ class SectionSettings(BaseModel):
     simulate_human: bool = True
     daily_limit: Optional[int] = None
     quick_scan_depth: Optional[int] = 10
+    deep_identity_resolution: Optional[bool] = False
 
 class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]

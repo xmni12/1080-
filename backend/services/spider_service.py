@@ -278,8 +278,76 @@ class DiscuzSpiderService:
                                                 stranger_names = ", ".join(strangers)
                                                 blocked_names = ", ".join(blocked)
                                                 self._log(f"💡 [{code}] 多人共演豁免：虽然含黑名单 [{blocked_names}]，但存在共演 [{stranger_names}]，放行下载。", level="info")
+
+                                # --- 深度身份逆向解析 (Option A 落地) ---
+                                if not whitelisted and not blocked and config.get('deep_identity_resolution'):
+                                    if not hasattr(self, '_deep_checked_cache'):
+                                        self._deep_checked_cache = set()
+                                        
+                                    for actor in actor_names:
+                                        if actor not in self._deep_checked_cache:
+                                            self._deep_checked_cache.add(actor)
+                                            self._log(f"🕵️ 触发深度身份溯源：正在反向解析 [{actor}] 的隐藏马甲...")
+                                            scraped_aliases = await avbase_client.get_actor_aliases(actor)
+                                            
+                                            if scraped_aliases:
+                                                matched_wl = None
+                                                matched_bl = None
                                                 
-                                await session.commit() # Ensure any avatar updates are saved even if not blocked/whitelisted
+                                                # Check Whitelist
+                                                for wl in wl_all:
+                                                    wl_names = set([wl.name] + ([n.strip() for n in wl.aliases.split(',')] if wl.aliases else []))
+                                                    if any(sa in wl_names for sa in scraped_aliases):
+                                                        matched_wl = wl
+                                                        wl_names.update(scraped_aliases)
+                                                        wl_names.add(actor)
+                                                        wl.aliases = ",".join(filter(None, wl_names))
+                                                        break
+                                                        
+                                                # Check Blacklist
+                                                if not matched_wl:
+                                                    for bl in bl_all:
+                                                        bl_names = set([bl.name] + ([n.strip() for n in bl.aliases.split(',')] if bl.aliases else []))
+                                                        if any(sa in bl_names for sa in scraped_aliases):
+                                                            matched_bl = bl
+                                                            bl_names.update(scraped_aliases)
+                                                            bl_names.add(actor)
+                                                            bl.aliases = ",".join(filter(None, bl_names))
+                                                            break
+                                                            
+                                                if matched_wl:
+                                                    await session.commit()
+                                                    self._log(f"🎯 溯源成功！[{actor}] 真实身份为白名单的 [{matched_wl.name}]")
+                                                    whitelisted.append(matched_wl.name)
+                                                    covered_actor_names.add(actor)
+                                                    
+                                                    # Re-apply whitelist logic
+                                                    wl_names_str = ", ".join(whitelisted)
+                                                    self._log(f"💖 [{code}] 溯源追回特权：包含心动女优 [{wl_names_str}]，最高优先级放行！", level="success")
+                                                    if len(covered_actor_names) == len(actor_names):
+                                                        wl_save_path = config.get('whitelist_save_path', '').strip()
+                                                        task_save_path = wl_save_path if wl_save_path else os.path.join(save_path, "精选演员")
+                                                        if not os.path.exists(task_save_path): os.makedirs(task_save_path)
+                                                    break
+                                                    
+                                                elif matched_bl:
+                                                    await session.commit()
+                                                    self._log(f"🎯 溯源成功！[{actor}] 真实身份为黑名单的 [{matched_bl.name}]")
+                                                    blocked.append(matched_bl.name)
+                                                    # Re-apply blacklist logic
+                                                    if len(actor_names) == 1:
+                                                        self._log(f"🚧 [{code}] 溯源黑名单拦截：主演 [{matched_bl.name}]，已丢弃！", level="warn")
+                                                        return
+                                                    elif len(blocked) == len(actor_names):
+                                                        self._log(f"🚧 [{code}] 溯源全员黑名单拦截：所有主演皆被封杀，已丢弃！", level="warn")
+                                                        return
+                                                    else:
+                                                        strangers = [a for a in actor_names if a not in blocked and a != actor]
+                                                        stranger_names = ", ".join(strangers)
+                                                        self._log(f"💡 [{code}] 溯源多人共演豁免：虽然含黑名单 [{matched_bl.name}]，但存在共演 [{stranger_names}]，放行下载。", level="info")
+                                                    break
+                                                    
+                                await session.commit() # Ensure any avatar or alias updates are saved even if not blocked/whitelisted
                         
                         async with sem:
                             if self.stop_requested: return
