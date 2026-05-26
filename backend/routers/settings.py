@@ -3,12 +3,24 @@ from fastapi.responses import FileResponse
 from backend.schemas import GlobalSettings, SectionSettings
 from core.utils import load_config, save_config
 from backend.services.scheduler_service import scheduler_service
+from backend.services.cleanup_service import cleanup_service
 import os
 import zipfile
 import tempfile
 import time
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+@router.post("/cleanup")
+async def trigger_cleanup():
+    """
+    手动触发系统垃圾回收与深度清理
+    """
+    try:
+        results = await cleanup_service.execute_cleanup()
+        return {"status": "success", "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/backup")
 async def backup_data():

@@ -2,6 +2,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from core.utils import load_config
 from backend.services.task_manager import task_manager
+from backend.services.cleanup_service import cleanup_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,26 @@ class SchedulerService:
         
         # 清理旧任务
         for job_id in list(self.jobs.keys()):
-            self.scheduler.remove_job(job_id)
+            try:
+                self.scheduler.remove_job(job_id)
+            except: pass
             del self.jobs[job_id]
+
+        # 挂载每日自动瘦身任务
+        async def run_cleanup():
+            logger.info("Cron triggered: Daily Cleanup at 04:00")
+            await cleanup_service.execute_cleanup()
+            
+        self.scheduler.add_job(
+            run_cleanup,
+            'cron',
+            hour=4,
+            minute=0,
+            id='daily_cleanup',
+            replace_existing=True
+        )
+        self.jobs['daily_cleanup'] = True
+        logger.info("✅ 垃圾回收任务挂载成功: 每天 04:00 执行")
 
         for section_key, s_config in sections.items():
             if s_config.get("timer_enabled"):

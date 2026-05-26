@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Settings2, Loader2, Download, UploadCloud } from 'lucide-react';
+import { Save, Settings2, Loader2, Download, UploadCloud, Trash2 } from 'lucide-react';
 import axios from 'axios';
 
 export function Settings() {
@@ -81,6 +81,23 @@ export function Settings() {
       alert('恢复失败：' + (error.response?.data?.detail || error.message));
     } finally {
         e.target.value = ''; // Reset input
+    }
+  };
+
+  const handleCleanup = async () => {
+    if (!confirm('确认要执行系统垃圾回收与深度清理吗？\n\n这将会：\n1. 清空所有旧的运行日志\n2. 清理浏览器临时缓存文件\n3. 对 SQLite 数据库进行碎片整理（VACUUM）\n\n注意：清理过程可能需要几秒到几十秒不等，期间请勿进行其他操作。')) {
+      return;
+    }
+    
+    try {
+      const res = await axios.post('http://127.0.0.1:8000/api/settings/cleanup');
+      if (res.data.status === 'success') {
+          const resultText = res.data.results.join('\n');
+          alert('深度清理完成！\n\n执行报告：\n' + resultText);
+      }
+    } catch (error: any) {
+      console.error('Cleanup failed', error);
+      alert('清理失败：' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -352,6 +369,26 @@ export function Settings() {
                   </button>
               </div>
           </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-rose-500">
+          <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+            <span className="w-1.5 h-4 bg-rose-500 rounded-full"></span>
+            系统瘦身与空间释放
+          </h4>
+          <div className="text-sm text-slate-500 mb-6">
+            系统在长期运行中，底层浏览器会产生大量网页图片缓存，被删除的数据库记录也会变为占用硬盘空间的“虚无碎片”。你可以随时执行一键大扫除，或依赖系统每天凌晨 04:00 的自动垃圾回收。
+          </div>
+          <button 
+            onClick={handleCleanup}
+            className="w-full md:w-1/2 flex items-center justify-center gap-3 bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 text-slate-700 px-6 py-4 rounded-xl font-medium transition-all shadow-sm"
+          >
+            <Trash2 className="w-5 h-5" />
+            <div className="text-left">
+              <div className="font-bold">一键执行深度清理</div>
+              <div className="text-xs opacity-70">清空缓存 / 压缩数据库 / 删减旧日志</div>
+            </div>
+          </button>
       </div>
     </div>
   );
