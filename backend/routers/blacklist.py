@@ -7,6 +7,7 @@ from datetime import datetime
 from backend.database import get_db
 from backend.models import BlacklistActor
 from backend.schemas import PaginatedBlacklistResponse, AddBlacklistRequest, DeleteRequest
+from backend.services.avbase_client import avbase_client
 
 router = APIRouter(prefix="/api/blacklist", tags=["blacklist"])
 
@@ -53,17 +54,26 @@ async def add_blacklist(request: AddBlacklistRequest, db: AsyncSession = Depends
             skipped += 1
 
     for name, aliases in unique_names.items():
+        # Auto-fetch aliases from AVBase
+        scraped_aliases = await avbase_client.get_actor_aliases(name)
+        combined_aliases_set = set([a.strip() for a in aliases.split(',') if a.strip()])
+        for sa in scraped_aliases:
+            combined_aliases_set.add(sa.strip())
+        final_aliases = ",".join(filter(None, combined_aliases_set))
+
         stmt = select(BlacklistActor).where(BlacklistActor.name == name)
         result = await db.execute(stmt)
         actor = result.scalar_one_or_none()
         if not actor:
-            new_actor = BlacklistActor(name=name, aliases=aliases, added_time=datetime.now())
+            new_actor = BlacklistActor(name=name, aliases=final_aliases, added_time=datetime.now())
             db.add(new_actor)
             added += 1
         else:
-            # Update aliases if provided
-            if aliases and actor.aliases != aliases:
-                actor.aliases = aliases
+            # Update aliases if provided or scraped
+            if final_aliases:
+                existing_set = set([a.strip() for a in (actor.aliases or "").split(',') if a.strip()])
+                new_set = existing_set.union(combined_aliases_set)
+                actor.aliases = ",".join(filter(None, new_set))
             skipped += 1
     await db.commit()
     return {"status": "success", "added": added, "skipped": skipped}

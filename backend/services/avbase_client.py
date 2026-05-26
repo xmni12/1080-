@@ -141,4 +141,47 @@ class AvbaseClient:
             logger.error(f"AVBase talent fetch exception: {e}")
             return {"actor_name": "未知演员", "works": []}
 
+    async def get_actor_aliases(self, name: str) -> list[str]:
+        """
+        通过演员名查询其所有的别名/马甲
+        """
+        try:
+            import urllib.parse
+            from bs4 import BeautifulSoup
+            import json
+            
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            url = f"{self.base_url}/talents/{urllib.parse.quote(name)}"
+            
+            async with CurlAsyncSession(impersonate='chrome120', timeout=15.0) as client:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    return []
+                    
+                soup = BeautifulSoup(resp.text, 'lxml')
+                script_tag = soup.find('script', id='__NEXT_DATA__')
+                if script_tag and script_tag.string:
+                    try:
+                        data = json.loads(script_tag.string)
+                        talents = data.get('props', {}).get('pageProps', {}).get('talents', [])
+                        if talents:
+                            actors = talents[0].get('actors', [])
+                            aliases = []
+                            for a in actors:
+                                a_name = a.get('name')
+                                # Strip URL query params if any, and avoid adding the exact requested name
+                                if a_name:
+                                    clean_name = a_name.split('?')[0].strip()
+                                    if clean_name and clean_name.lower() != name.lower():
+                                        aliases.append(clean_name)
+                            # Remove duplicates
+                            return list(dict.fromkeys(aliases))
+                    except Exception as e:
+                        logger.error(f"JSON parsing error for {name} aliases: {e}")
+                        
+                return []
+        except Exception as e:
+            logger.error(f"Failed to fetch aliases for {name}: {e}")
+            return []
+
 avbase_client = AvbaseClient()
