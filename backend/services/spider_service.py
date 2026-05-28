@@ -534,6 +534,21 @@ class DiscuzSpiderService:
                         logger.error(f"CurlCffi File Download failed for {code}: {e}")
                         continue
                         
+                # 触发死亡黑匣子探针 (Debug Dumper)
+                try:
+                    dump_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), f"debug_dump_{code}.txt")
+                    with open(dump_file, "w", encoding="utf-8") as f:
+                        f.write(f"=== DEBUG DUMP FOR {code} ===\n")
+                        f.write(f"DETAIL URL: {detail_url_full}\n")
+                        f.write(f"EXTRACTED HREFS ({len(hrefs)}):\n")
+                        for h in hrefs:
+                            f.write(f" - {h}\n")
+                        f.write("\n=== HTML SOURCE ===\n")
+                        f.write(html_text)
+                    self._log(f"📦 [{code}] 已触发死亡黑匣子！现场证据已保存至项目根目录的 debug_dump_{code}.txt", level="warn")
+                except Exception as dump_e:
+                    logger.error(f"Failed to write debug dump for {code}: {dump_e}")
+                    
                 return "NO_VALID_DOWNLOAD"
                 
         except Exception as e:
