@@ -456,9 +456,15 @@ class DiscuzSpiderService:
             "Referer": "https://x999x.me/forum.php"
         }
 
+        
+        # 动态推断浏览器指纹
+        ua = headers.get("User-Agent", "").lower() if isinstance(headers, dict) else (self.page.user_agent.lower() if hasattr(self, 'page') else page.user_agent.lower())
+        impersonate_profile = "chrome120"
+        if "edg/" in ua or "edge" in ua:
+            impersonate_profile = "edge101"
+            
         try:
-            # 替换 httpx 为 curl_cffi，完美伪装 Chrome 120 的 TLS 指纹
-            async with CurlAsyncSession(impersonate='chrome120', cookies=cookies_dict, headers=headers, verify=False, timeout=25.0) as client:
+            async with CurlAsyncSession(impersonate=impersonate_profile, cookies=cookies_dict, headers=headers, verify=False, timeout=25.0) as client:
                 await asyncio.sleep(random.uniform(1.0, 2.5)) # 并发前微调延迟
                 
                 # 1. 纯代码并发获取帖子详情页
