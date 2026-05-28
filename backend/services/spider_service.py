@@ -441,8 +441,8 @@ class DiscuzSpiderService:
 
     async def _download_attachments(self, detail_url: str, code: str, save_path: str, config: Dict[str, Any]) -> str:
         if not self.page: return "FAILED"
-        import httpx
         import urllib.parse
+        from curl_cffi.requests import AsyncSession as CurlAsyncSession
 
         try:
             cookies_dict = self.page.cookies().as_dict()
@@ -457,12 +457,13 @@ class DiscuzSpiderService:
         }
 
         try:
-            async with httpx.AsyncClient(cookies=cookies_dict, headers=headers, verify=False, timeout=25.0) as client:
+            # 替换 httpx 为 curl_cffi，完美伪装 Chrome 120 的 TLS 指纹
+            async with CurlAsyncSession(impersonate='chrome120', cookies=cookies_dict, headers=headers, verify=False, timeout=25.0) as client:
                 await asyncio.sleep(random.uniform(1.0, 2.5)) # 并发前微调延迟
                 
                 # 1. 纯代码并发获取帖子详情页
                 detail_url_full = detail_url if detail_url.startswith('http') else urllib.parse.urljoin("https://x999x.me/", detail_url)
-                resp = await client.get(detail_url_full, follow_redirects=True)
+                resp = await client.get(detail_url_full, allow_redirects=True)
                 
                 if resp.status_code != 200:
                     return f"HTTP_ERROR_{resp.status_code}"
@@ -493,7 +494,7 @@ class DiscuzSpiderService:
                         download_url = href if href.startswith('http') else urllib.parse.urljoin("https://x999x.me/", href)
                         await asyncio.sleep(random.uniform(0.5, 1.5))
                         
-                        dl_resp = await client.get(download_url, follow_redirects=True)
+                        dl_resp = await client.get(download_url, allow_redirects=True)
                         if dl_resp.status_code == 200:
                             # 校验是否超配额 (以二进制方式查找关键字)
                             if any(kw in dl_resp.content for kw in [b"\xe5\xb7\xb2\xe8\xb6\x85\xe5\x87\xba", b"\xe7\xb8\xbd\xe8\xa8\x88", b"\xe6\x9d\x83\xe9\x99\x90", b"\xe6\xac\xa1\xe6\x95\xb0\xe5\xb7\xb2\xe6\xbb\xa1"]): # UTF-8 编码的 "已超出", "總計", "权限", "次数已满"
@@ -529,21 +530,16 @@ class DiscuzSpiderService:
                             return "SUCCESS"
                         else:
                             return f"DL_HTTP_ERROR_{dl_resp.status_code}"
-                    except httpx.TimeoutException:
-                        continue # 尝试下一个链接
                     except Exception as e:
-                        logger.error(f"HTTPX File Download failed for {code}: {e}")
+                        logger.error(f"CurlCffi File Download failed for {code}: {e}")
                         continue
                         
                 return "NO_VALID_DOWNLOAD"
                 
-        except httpx.TimeoutException:
-            return "TIMEOUT"
-        except httpx.RequestError as e:
-            logger.error(f"HTTPX Request Error for {code}: {e}")
-            return f"ERR:{type(e).__name__}"
         except Exception as e:
-            logger.error(f"HTTPX Detail Fetch failed for {code}: {e}")
+            logger.error(f"CurlCffi Detail Fetch failed for {code}: {e}")
+            if 'timeout' in str(e).lower():
+                return "TIMEOUT"
             return f"ERR:{type(e).__name__}"
 
     def stop(self):
