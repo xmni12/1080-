@@ -204,7 +204,24 @@ class DiscuzSpiderService:
                                     return
                         
                         # --- AVBase 智能多维演员滤网 (A+B方案) ---
-                        actors_info = await avbase_client.get_actors_by_code(code)
+                        work_info = await avbase_client.get_work_info_by_code(code)
+                        avbase_title = work_info.get("title", "")
+                        actors_info = work_info.get("actors", [])
+                        
+                        # --- 核心元数据标题屏蔽词检测 (AVBase Title) ---
+                        if avbase_title:
+                            is_avbase_blocked = False
+                            async with db_lock:
+                                tb_stmt = select(TitleBlocklist)
+                                tb_all = (await session.execute(tb_stmt)).scalars().all()
+                                for tb in tb_all:
+                                    if tb.keyword.lower() in avbase_title.lower():
+                                        self._log(f"🚧 [{code}] 命中核心元数据标题屏蔽词 [{tb.keyword}] (源自 AVBase: {avbase_title[:20]}...)，已直接丢弃！", level="warn")
+                                        is_avbase_blocked = True
+                                        break
+                            if is_avbase_blocked:
+                                return
+                        
                         if actors_info:
                             actor_names = [a["name"] for a in actors_info]
                             async with db_lock:
@@ -348,12 +365,20 @@ class DiscuzSpiderService:
                                                     break
                                                     
                                 # --- 终极拦截：纯净白名单模式 (Strict Whitelist Mode) ---
-                                if config.get('strict_whitelist_mode') and not whitelisted:
-                                    # 此时黑名单已测过，深度溯源也测过，如果依然没有哪怕一个白名单成员，立刻枪毙
-                                    self._log(f"🚧 [{code}] 纯净白名单模式拦截：该资源未包含任何白名单女优，已被丢弃！", level="warn")
-                                    return
+                                if config.get('strict_whitelist_mode'):
+                                    if not whitelisted:
+                                        self._log(f"🚧 [{code}] 纯净白名单模式拦截：该资源未包含任何白名单女优，已被丢弃！", level="warn")
+                                        return
+                                    elif config.get('strict_multiparty_mode') and not is_pure:
+                                        self._log(f"🚧 [{code}] 绝对洁癖模式拦截：该资源含有路人演员，纯度未达 100%，已被无情丢弃！", level="warn")
+                                        return
 
                                 await session.commit() # Ensure any avatar or alias updates are saved even if not blocked/whitelisted
+                        else:
+                            # 没查到任何演员信息的情况（素人/无名作品）
+                            if config.get('strict_whitelist_mode'):
+                                self._log(f"🚧 [{code}] 纯净白名单模式拦截：该资源在 AVBase 上无参演演员信息，已被丢弃！", level="warn")
+                                return
                         
                         async with sem:
                             if self.stop_requested: return
