@@ -226,6 +226,34 @@ export function Settings() {
                 启用深度身份逆向解析 (遇到陌生女优自动深挖所有马甲并比对，速度较慢但 100% 不漏)
               </label>
             </div>
+            <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2">
+              <input 
+                type="checkbox" 
+                id={`strict_${section}`}
+                checked={config.sections[section]?.strict_whitelist_mode ?? false}
+                onChange={e => updateSection(section, 'strict_whitelist_mode', e.target.checked)}
+                className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500"
+              />
+              <label htmlFor={`strict_${section}`} className="text-sm font-bold text-amber-600 cursor-pointer">
+                开启纯净白名单模式 (非白即杀：仅下载包含白名单演员的资源，非白名单一律拦截丢弃)
+              </label>
+            </div>
+            
+            {config.sections[section]?.strict_whitelist_mode && (
+              <div className="space-y-2 flex items-center gap-3 md:col-span-2 pl-8 animate-in slide-in-from-top-2 duration-300">
+                <input 
+                  type="checkbox" 
+                  id={`multiparty_${section}`}
+                  checked={config.sections[section]?.strict_multiparty_mode ?? false}
+                  onChange={e => updateSection(section, 'strict_multiparty_mode', e.target.checked)}
+                  className="w-4 h-4 text-red-500 rounded border-red-300 focus:ring-red-500"
+                />
+                <label htmlFor={`multiparty_${section}`} className="text-sm font-medium text-red-600 cursor-pointer">
+                  [子开关] 绝对洁癖模式：多人共演作品必须 100% 全员都在白名单内才允许放行！(否则直接丢弃)
+                </label>
+              </div>
+            )}
+            
             <div className="space-y-2 flex items-center gap-3 md:col-span-2 pt-2 border-t border-slate-100">
               <input 
                 type="checkbox" 

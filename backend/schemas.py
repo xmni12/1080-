@@ -51,6 +51,8 @@ class SectionSettings(BaseModel):
     daily_limit: Optional[int] = None
     quick_scan_depth: Optional[int] = 10
     deep_identity_resolution: Optional[bool] = False
+    strict_whitelist_mode: Optional[bool] = False
+    strict_multiparty_mode: Optional[bool] = False
 
 class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]

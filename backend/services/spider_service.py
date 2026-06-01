@@ -347,6 +347,12 @@ class DiscuzSpiderService:
                                                         self._log(f"💡 [{code}] 溯源多人共演豁免：虽然含黑名单 [{matched_bl.name}]，但存在共演 [{stranger_names}]，放行下载。", level="info")
                                                     break
                                                     
+                                # --- 终极拦截：纯净白名单模式 (Strict Whitelist Mode) ---
+                                if config.get('strict_whitelist_mode') and not whitelisted:
+                                    # 此时黑名单已测过，深度溯源也测过，如果依然没有哪怕一个白名单成员，立刻枪毙
+                                    self._log(f"🚧 [{code}] 纯净白名单模式拦截：该资源未包含任何白名单女优，已被丢弃！", level="warn")
+                                    return
+
                                 await session.commit() # Ensure any avatar or alias updates are saved even if not blocked/whitelisted
                         
                         async with sem:
