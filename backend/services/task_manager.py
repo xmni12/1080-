@@ -782,7 +782,8 @@ class TaskManager:
                 
                 # 为了确保能存入白名单文件夹，这里需要再次查一次纯净度
                 task_save_path = save_path
-                actors_info = await avbase_client.get_actors_by_code(code)
+                work_info = await avbase_client.get_work_info_by_code(code)
+                actors_info = work_info.get("actors", [])
                 if actors_info:
                     actor_names = [a["name"] for a in actors_info]
                     async with AsyncSessionLocal() as session:
