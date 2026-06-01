@@ -593,7 +593,7 @@ class TaskManager:
                     ws_log(f"🚧 [{code}] 未解析到有效的搜索结果条目。", explicit_level="warn")
                     continue
                     
-                # 优先级排序: 4K超清 > VR視頻 > 高清有碼 > 其他
+                # 优先级排序: 仅限 4K超清 > 高清有碼 (严格剔除 VR 和 字幕)
                 target_result = None
                 
                 for res in results:
@@ -601,6 +601,9 @@ class TaskManager:
                     title = res["title"]
                     # 必须确认标题真的包含目标番号，防止论坛搜索引擎瞎匹配
                     if code.upper() not in title.upper():
+                        continue
+                    # 如果标题明确包含 VR，直接跳过
+                    if "VR" in title.upper() or "VR" in forum.upper():
                         continue
                         
                     if "4K" in forum or "4K" in title.upper():
@@ -613,31 +616,25 @@ class TaskManager:
                         forum = res["forum"]
                         title = res["title"]
                         if code.upper() not in title.upper(): continue
-                        if "VR" in forum or "VR" in title.upper():
-                            target_result = res
-                            target_result["section"] = "vr"
-                            break
-                            
-                if not target_result:
-                    for res in results:
-                        forum = res["forum"]
-                        title = res["title"]
-                        if code.upper() not in title.upper(): continue
+                        if "VR" in title.upper() or "VR" in forum.upper(): continue
+                        
                         if "高清" in forum or "有碼" in forum or "HD" in title.upper():
                             target_result = res
                             target_result["section"] = "hd"
                             break
 
                 if not target_result:
-                    # 随便选一个包含番号的
+                    # 随便选一个包含番号且非 VR 的
                     for res in results:
-                        if code.upper() in res["title"].upper():
+                        forum = res["forum"]
+                        title = res["title"]
+                        if code.upper() in title.upper() and "VR" not in title.upper() and "VR" not in forum.upper():
                             target_result = res
                             target_result["section"] = "hd" # 默认归入 hd
                             break
                             
                 if not target_result:
-                    ws_log(f"🚧 [{code}] 搜索结果中没有完全匹配的标题，安全跳过。", explicit_level="warn")
+                    ws_log(f"🚧 [{code}] 搜索结果中无匹配的 4K/HD 资源 (可能只有VR或不包含番号)，跳过。", explicit_level="warn")
                     continue
                     
                 # 开始执行下载

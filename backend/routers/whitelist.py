@@ -85,3 +85,43 @@ async def delete_whitelist(request: DeleteRequest, db: AsyncSession = Depends(ge
     result = await db.execute(stmt)
     await db.commit()
     return {"status": "success", "deleted": result.rowcount}
+
+@router.post("/completion/{actor_name}")
+async def start_actor_completion(actor_name: str, db: AsyncSession = Depends(get_db)):
+    """
+    触发单个演员的全集制霸刮削任务
+    """
+    from backend.services.avbase_client import avbase_client
+    from backend.models import DownloadRecord
+    from sqlalchemy import select
+    from backend.services.task_manager import task_manager
+    import asyncio
+    
+    # 1. 抓取 AVBase 全集番号
+    works = await avbase_client.get_actor_works(actor_name)
+    if not works:
+        return {"status": "error", "message": f"未能在 AVBase 上找到 [{actor_name}] 的任何作品，或网络受限。"}
+        
+    all_codes = [w['code'].upper() for w in works]
+    
+    # 2. 从数据库中查询已拥有的
+    stmt = select(DownloadRecord.code).where(DownloadRecord.code.in_(all_codes))
+    result = await db.execute(stmt)
+    owned_codes = set(result.scalars().all())
+    
+    # 3. 计算缺失的番号
+    missing_codes = [code for code in all_codes if code not in owned_codes]
+    
+    if not missing_codes:
+        return {"status": "success", "message": f"[{actor_name}] 的生涯全集已 100% 存在于你的数据库中，无需补全！"}
+        
+    # 4. 派发给特遣队
+    asyncio.create_task(task_manager.run_completion_search(missing_codes))
+    
+    return {
+        "status": "success", 
+        "total": len(all_codes),
+        "owned": len(owned_codes),
+        "missing": len(missing_codes),
+        "message": f"已将 {len(missing_codes)} 个缺失番号投入补全队列！"
+    }
