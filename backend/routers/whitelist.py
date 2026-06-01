@@ -92,9 +92,11 @@ async def start_actor_completion(actor_name: str, db: AsyncSession = Depends(get
     触发单个演员的全集制霸刮削任务
     """
     from backend.services.avbase_client import avbase_client
+    from backend.services.emby_client import emby_client
     from backend.models import DownloadRecord
     from sqlalchemy import select
     from backend.services.task_manager import task_manager
+    from core.utils import load_config
     import asyncio
     
     # 1. 抓取 AVBase 全集番号
@@ -104,16 +106,32 @@ async def start_actor_completion(actor_name: str, db: AsyncSession = Depends(get
         
     all_codes = [w['code'].upper() for w in works]
     
-    # 2. 从数据库中查询已拥有的
-    stmt = select(DownloadRecord.code).where(DownloadRecord.code.in_(all_codes))
-    result = await db.execute(stmt)
-    owned_codes = set(result.scalars().all())
+    config = load_config()
+    emby_conf = config.get("emby", {})
+    
+    owned_codes = set()
+    source_of_truth = "本地数据库"
+    
+    # 2. 优先使用 Emby API 获取真实的物理资产
+    if emby_conf.get("enabled"):
+        emby_codes = await emby_client.get_all_movie_codes()
+        if emby_codes:
+            # 过滤出当前目标演员相关的已有资源
+            owned_codes = {code for code in all_codes if code in emby_codes}
+            source_of_truth = "Emby 物理媒体库"
+        else:
+            return {"status": "error", "message": "已开启 Emby 同步但未能获取数据，请检查【系统设置】中的 Emby 配置是否正确或服务端是否启动。"}
+    else:
+        # 退回使用本地 SQLite 数据库作为对账来源
+        stmt = select(DownloadRecord.code).where(DownloadRecord.code.in_(all_codes))
+        result = await db.execute(stmt)
+        owned_codes = set(result.scalars().all())
     
     # 3. 计算缺失的番号
     missing_codes = [code for code in all_codes if code not in owned_codes]
     
     if not missing_codes:
-        return {"status": "success", "message": f"[{actor_name}] 的生涯全集已 100% 存在于你的数据库中，无需补全！"}
+        return {"status": "success", "message": f"根据【{source_of_truth}】对账：[{actor_name}] 的生涯全集已 100% 拥有，无需补全！"}
         
     # 4. 派发给特遣队
     asyncio.create_task(task_manager.run_completion_search(missing_codes))
@@ -123,5 +141,5 @@ async def start_actor_completion(actor_name: str, db: AsyncSession = Depends(get
         "total": len(all_codes),
         "owned": len(owned_codes),
         "missing": len(missing_codes),
-        "message": f"已将 {len(missing_codes)} 个缺失番号投入补全队列！"
+        "message": f"已基于【{source_of_truth}】生成缺失清单，成功将 {len(missing_codes)} 个目标投入特遣队！"
     }

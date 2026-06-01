@@ -2,26 +2,41 @@ import httpx
 import logging
 import re
 from typing import List, Set
-from core.utils import extract_code
+from core.utils import extract_code, load_config
 
 logger = logging.getLogger(__name__)
 
 class EmbyClient:
     def __init__(self):
-        self.base_url = "http://192.168.31.77:8091"
-        self.api_key = "6b27a306836f49c3ac7b63af43736a0e"
+        pass
+
+    def _get_config(self):
+        config = load_config()
+        return config.get('emby', {})
 
     async def get_all_movie_codes(self) -> Set[str]:
         """
         获取 Emby 媒体库中所有电影的番号
         """
+        emby_conf = self._get_config()
+        if not emby_conf.get('enabled'):
+            logger.info("Emby API is disabled in settings.")
+            return set()
+            
+        base_url = emby_conf.get('server_url', '').rstrip('/')
+        api_key = emby_conf.get('api_key', '')
+        
+        if not base_url or not api_key:
+            logger.warning("Emby configuration is incomplete.")
+            return set()
+
         owned_codes = set()
         try:
-            url = f"{self.base_url}/emby/Items"
+            url = f"{base_url}/emby/Items"
             params = {
                 "Recursive": "true",
                 "IncludeItemTypes": "Movie",
-                "api_key": self.api_key,
+                "api_key": api_key,
                 "Fields": "Name,OriginalTitle"
             }
             

@@ -89,15 +89,17 @@ async def get_settings():
     """
     获取全局配置
     """
+    from backend.schemas import EmbySettings
     config = load_config()
     
     sections = {}
     hide_browser = config.get("hide_browser", False)
     spider_threads = config.get("spider_threads", 1)
     browser_path = config.get("browser_path", "")
+    emby_config = config.get("emby", {})
     
     for key, value in config.items():
-        if isinstance(value, dict) and key != "sections":
+        if isinstance(value, dict) and key not in ["sections", "emby"]:
             sections[key] = SectionSettings(**value)
         elif key == "sections":
             for sub_k, sub_v in value.items():
@@ -107,7 +109,8 @@ async def get_settings():
         sections=sections,
         hide_browser=hide_browser,
         spider_threads=spider_threads,
-        browser_path=browser_path
+        browser_path=browser_path,
+        emby=EmbySettings(**emby_config) if emby_config else None
     )
 
 @router.post("")
@@ -123,6 +126,8 @@ async def update_settings(settings: GlobalSettings):
     config_data["hide_browser"] = settings.hide_browser
     config_data["spider_threads"] = settings.spider_threads
     config_data["browser_path"] = settings.browser_path
+    if settings.emby:
+        config_data["emby"] = settings.emby.model_dump()
     
     save_config(config_data)
     

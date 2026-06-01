@@ -284,6 +284,52 @@ export function Settings() {
       
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+            <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
+            Emby 物理对账中心 (Emby Sync)
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="space-y-2 flex items-center gap-3 md:col-span-2">
+              <input 
+                type="checkbox" 
+                id="emby_enabled"
+                checked={config.emby?.enabled ?? false}
+                onChange={e => setConfig({ ...config, emby: { ...config.emby, enabled: e.target.checked } })}
+                className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-600"
+              />
+              <label htmlFor="emby_enabled" className="text-sm font-bold text-purple-700 cursor-pointer">
+                开启 Emby API 同步验证 (开启后，【女优补全计划】将从查阅本地数据库切换为通过 Emby API 查询硬盘真实视频库，解决手动删片导致的幽灵数据对账问题)
+              </label>
+            </div>
+            
+            {config.emby?.enabled && (
+              <>
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-medium text-slate-700">Emby 服务器地址 (包含协议和端口)</label>
+                  <input 
+                    type="text" 
+                    value={config.emby?.server_url || ''}
+                    onChange={e => setConfig({ ...config, emby: { ...config.emby, server_url: e.target.value } })}
+                    placeholder="例如: http://192.168.31.77:8091"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  />
+                </div>
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-medium text-slate-700">Emby API Key (控制台 -&gt; 高级 -&gt; API密钥)</label>
+                  <input 
+                    type="password" 
+                    value={config.emby?.api_key || ''}
+                    onChange={e => setConfig({ ...config, emby: { ...config.emby, api_key: e.target.value } })}
+                    placeholder="例如: 6b27a306836f49c3ac7b63af43736a0e"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
             <span className="w-1.5 h-4 bg-slate-800 rounded-full"></span>
             高级参数
           </h4>

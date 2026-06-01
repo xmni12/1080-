@@ -54,11 +54,17 @@ class SectionSettings(BaseModel):
     strict_whitelist_mode: Optional[bool] = False
     strict_multiparty_mode: Optional[bool] = False
 
+class EmbySettings(BaseModel):
+    enabled: bool = False
+    server_url: str = ""
+    api_key: str = ""
+
 class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
     spider_threads: int = 1
     browser_path: Optional[str] = ""
+    emby: Optional[EmbySettings] = None
 
 class BlacklistActorResponse(BaseModel):
     id: int
