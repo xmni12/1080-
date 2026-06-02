@@ -38,8 +38,8 @@ async def trigger_sniper_download(request: dict, background_tasks: BackgroundTas
         "section": section
     }
     
-    background_tasks.add_task(task_manager.run_retry_tasks, [record])
-    return {"status": "started", "message": "狙击下载任务已派发至死链特遣队！"}
+    background_tasks.add_task(task_manager.run_sniper_task, [record])
+    return {"status": "started", "message": "狙击下载任务已派发至专属狙击引擎！"}
 
 @router.get("/queue")
 async def get_queue():

@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 from backend.database import AsyncSessionLocal
 from backend.services.spider_service import DiscuzSpiderService
-from backend.routers.websocket import manager
+from backend.routers.websocket import manager, sniper_manager
 from DrissionPage import ChromiumPage, ChromiumOptions
 from core.utils import load_config
 
@@ -826,5 +826,251 @@ class TaskManager:
             except:
                 pass
             ws_log("✅ 死链抢救列车执行完毕。浏览器资源已释放。", explicit_level="success")
+
+    async def run_sniper_task(self, records: list[dict]):
+        """
+        死链精准抢救任务：直接跳转原帖进行重新下载
+        """
+        def ws_log(msg: str, explicit_level: str = None):
+            logger.info(msg)
+            try:
+                loop = asyncio.get_running_loop()
+                level = explicit_level if explicit_level else "info"
+                if level == "info":
+                    if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
+                    elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
+                    elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+            except: pass
+
+        if 'sniper' in self.active_pages:
+            ws_log("❌ 精准狙击任务已经在运行中，请勿重复启动。", explicit_level="error")
+            return
+
+        ws_log(f"🚑 精准狙击特遣队出发！收到 {len(records)} 个抢救目标，准备执行定点爆破...")
+        
+        config = load_config()
+        hide_browser = config.get("hide_browser", False)
+        
+        co = ChromiumOptions().set_local_port(9222)
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
+        if browser_path:
+            co.set_browser_path(browser_path)
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        if hide_browser: 
+            ws_log("已开启无头静默模式运行。")
+            co.set_argument('--window-position=-32000,-32000')
+            
+        try:
+            page = ChromiumPage(addr_or_opts=co)
+            if hide_browser:
+                try: page.set.window.hide()
+                except: pass
+            
+            self.active_pages['sniper'] = page
+            ws_log("✅ DrissionPage 浏览器内核启动成功。")
+            
+            # 必须先访问一次该域名的主页，才能把该域名的持久化 Cookie 注入到 page 实例中
+            ws_log("⏳ 正在执行绿卡预热校验，等待突破 5 秒盾...")
+            page.get("https://x999x.me/")
+            # 等待出现论坛特征，证明破盾成功 (最多等 15 秒)
+            passed = False
+            for _ in range(15):
+                await asyncio.sleep(1)
+                html = page.html or ""
+                title = page.title or ""
+                if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
+                    passed = True
+                    break
+            
+            if passed:
+                ws_log("✅ 绿卡预热成功，Cookie 已热加载。")
+            else:
+                ws_log("⚠️ 绿卡预热超时，疑似遭到极其严厉的 CF 盾拦截，这可能导致接下来的下载遭遇 403。")
+            
+            
+        except Exception as e:
+            ws_log(f"❌ 浏览器启动失败: {e}", explicit_level="error")
+            return
+            
+        try:
+            spider = DiscuzSpiderService(page=page, log_callback=ws_log)
+            from backend.services.avbase_client import avbase_client
+            from sqlalchemy import select
+            from backend.models import WhitelistActor, FailedRecord
+            
+            for i, record in enumerate(records):
+                if self.stop_lab_requested:
+                    ws_log("🛑 抢救计划被强制终止。")
+                    break
+                    
+                code = record["code"]
+                target_url = record["post_url"]
+                section_key = record["section"]
+                title = record["title"]
+                
+                ws_log(f"🔍 正在执行第 {i+1}/{len(records)} 个抢救目标：[{code}]")
+                
+                section_config = config.get("sections", {}).get(section_key, {})
+                save_path = section_config.get("save_path", f"./downloads/{section_key}")
+                
+                # 为了确保能存入白名单文件夹，这里需要再次查一次纯净度
+                task_save_path = save_path
+                work_info = await avbase_client.get_work_info_by_code(code)
+                actors_info = work_info.get("actors", [])
+                if actors_info:
+                    actor_names = [a["name"] for a in actors_info]
+                    async with AsyncSessionLocal() as session:
+                        wl_stmt = select(WhitelistActor)
+                        wl_all = (await session.execute(wl_stmt)).scalars().all()
+                        
+                        covered_actor_names = set()
+                        for wl in wl_all:
+                            wl_aliases = [n.strip() for n in wl.aliases.split(',')] if wl.aliases else []
+                            wl_names_set = set([wl.name] + wl_aliases)
+                            matching_names = wl_names_set.intersection(set(actor_names))
+                            if matching_names:
+                                covered_actor_names.update(matching_names)
+                                
+                        if len(covered_actor_names) == len(actor_names) and len(actor_names) > 0:
+                            wl_save_path = section_config.get('whitelist_save_path', '').strip()
+                            if wl_save_path:
+                                task_save_path = wl_save_path
+                            else:
+                                task_save_path = os.path.join(save_path, "精选演员")
+                                
+                if not os.path.exists(task_save_path):
+                    os.makedirs(task_save_path)
+                    
+                # 随机延迟，模拟人类操作防封锁
+                await asyncio.sleep(random.uniform(5.0, 10.0))
+                
+                # --- 方案 B: 纯物理肉搏战 ---
+                ws_log(f"⚔️ 启动物理肉搏方案，强行驾驶浏览器驶入详情页: {target_url}")
+                page.get(target_url)
+                
+                # 等待 5 秒盾
+                passed_shield = False
+                for _ in range(20):
+                    await asyncio.sleep(1)
+                    title = page.title or ""
+                    html = page.html or ""
+                    if "Just a moment" not in title and "Cloudflare" not in title and "cf-turnstile" not in html:
+                        passed_shield = True
+                        break
+                        
+                if not passed_shield:
+                    dl_res = "CF_BLOCKED_PHYSICAL"
+                else:
+                    html_text = page.html or ""
+                    import html as html_lib
+                    import re
+                    hrefs = re.findall(r'href=["\']([^"\']*mod=attachment[^"\']*)["\']', html_text)
+                    if not hrefs:
+                        exts = ['.torrent', '.zip', '.rar', '.7z', '.tar', '.gz', '.txt']
+                        all_hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_text)
+                        hrefs = [h for h in all_hrefs if any(ext in h.lower() for ext in exts)]
+                        
+                    if not hrefs:
+                        dl_res = "NO_ATTACHMENT"
+                    else:
+                        hrefs = [html_lib.unescape(h) for h in hrefs]
+                        
+                        # 使用设置好 Cookie 的 curl_cffi 进行物理级辅助下载
+                        import urllib.parse
+                        from curl_cffi.requests import AsyncSession as CurlAsyncSession
+                        
+                        try:
+                            cookies_dict = page.cookies().as_dict()
+                        except TypeError:
+                            cookies_list = page.cookies(as_dict=False)
+                            cookies_dict = {c['name']: c['value'] for c in cookies_list}
+                            
+                        headers = {
+                            "User-Agent": page.user_agent,
+                            "Referer": target_url
+                        }
+                        
+                        dl_res = "NO_VALID_DOWNLOAD"
+                        ua = page.user_agent.lower()
+                        impersonate_profile = "chrome120"
+                        if "edg/" in ua or "edge" in ua:
+                            impersonate_profile = "edge101"
+                        async with CurlAsyncSession(impersonate=impersonate_profile, cookies=cookies_dict, headers=headers, verify=False, timeout=25.0) as client:
+                            for href in hrefs:
+                                try:
+                                    download_url = href if href.startswith('http') else urllib.parse.urljoin("https://x999x.me/", href)
+                                    await asyncio.sleep(random.uniform(0.5, 1.5))
+                                    dl_resp = await client.get(download_url, allow_redirects=True)
+                                    if dl_resp.status_code == 200:
+                                        if any(kw in dl_resp.content for kw in [b"\xe5\xb7\xb2\xe8\xb6\x85\xe5\x87\xba", b"\xe7\xb8\xbd\xe8\xa8\x88", b"\xe6\x9d\x83\xe9\x99\x90", b"\xe6\xac\xa1\xe6\x95\xb0\xe5\xb7\xb2\xe6\xbb\xa1"]):
+                                            dl_res = "QUOTA_LIMIT"
+                                            break
+                                            
+                                        content_head = dl_resp.content[:50]
+                                        ext = ""
+                                        if content_head.startswith(b'Rar!\x1a\x07'): ext = ".rar"
+                                        elif content_head.startswith(b'PK\x03\x04'): ext = ".zip"
+                                        elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'): ext = ".7z"
+                                        elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head: ext = ".torrent"
+                                        else:
+                                            dl_res = "INVALID_FILE_CONTENT"
+                                            continue
+                                            
+                                        safe_code = code.replace(":", "_").replace(" ", "_")
+                                        filename = f"{safe_code}{ext}"
+                                        file_path = os.path.join(task_save_path, filename)
+                                        
+                                        with open(file_path, "wb") as f:
+                                            f.write(dl_resp.content)
+                                            
+                                        dl_res = "SUCCESS"
+                                        break
+                                    else:
+                                        dl_res = f"DL_HTTP_ERROR_{dl_resp.status_code}"
+                                except Exception as e:
+                                    logger.error(f"Physical rescue download failed: {e}")
+                                    continue
+                
+                async with AsyncSessionLocal() as session:
+                    if dl_res == "SUCCESS":
+                        await spider.save_record(session, section_key, code, title, target_url)
+                        # 删除旧的失败记录
+                        fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                        fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                        if fail_record:
+                            await session.delete(fail_record)
+                            await session.commit()
+                        ws_log(f"✅ 🚑 [{code}] 抢救成功！附件已入库，已从狙击目标中移除。", explicit_level="success")
+                    elif dl_res == "QUOTA_LIMIT":
+                        ws_log("！！！触发论坛配额限制，抢救任务被迫终止！！！", explicit_level="error")
+                        break
+                    else:
+                        ws_log(f"❌ 🚑 [{code}] 抢救依然失败，原因码: {dl_res}。记录继续保留在狙击目标中。", explicit_level="error")
+                        # 更新失败时间或记录（可选）
+                        fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                        fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                        if fail_record:
+                            fail_record.reason = f"{dl_res} (重试失败)"
+                            fail_record.failed_time = datetime.now()
+                            await session.commit()
+                            
+        except Exception as e:
+            ws_log(f"❌ 精准狙击任务出现异常: {e}", explicit_level="error")
+        finally:
+            if 'sniper' in self.active_pages:
+                del self.active_pages['sniper']
+            try:
+                page.quit()
+            except:
+                pass
+            ws_log("✅ 精准狙击列车执行完毕。浏览器资源已释放。", explicit_level="success")
 
 task_manager = TaskManager()

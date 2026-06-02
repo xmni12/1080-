@@ -20,7 +20,7 @@ export function Sniper() {
   const [hasSearched, setHasSearched] = useState(false);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   
-  const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/logs');
+  const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/sniper_logs');
 
   const handleSearch = async (searchCode: string = code) => {
     if (!searchCode.trim()) return;
