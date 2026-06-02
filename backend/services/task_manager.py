@@ -103,46 +103,48 @@ class TaskManager:
         from core.utils import load_config
         
         config = load_config()
-        co = ChromiumOptions()
+        # 强制与主爬虫共用 9222 端口，实现完全的绿卡与指纹共享
+        co = ChromiumOptions().set_local_port(9222)
         if config.get("browser_path"):
             co.set_browser_path(config.get("browser_path"))
         
         profile_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'browser_profile')
         co.set_user_data_path(profile_path)
-        # 不使用 headless(True) 否则必定触发 CF 死循环盾
         co.set_argument('--window-position=-32000,-32000')
         
         page = None
+        tab = None
         results = []
         try:
             page = ChromiumPage(co)
+            # 开启新标签页，绝对不干扰正在运行的其他爬虫任务
+            tab = page.new_tab()
             
-            # 预热并等待过盾
-            page.get("https://x999x.me/")
+            # 预热并等待过盾 (共用绿卡，通常秒过)
+            tab.get("https://x999x.me/")
             for _ in range(15):
                 await asyncio.sleep(0.5)
-                html = page.html or ""
-                title = page.title or ""
+                html = tab.html or ""
+                title = tab.title or ""
                 if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
                     break
                     
             # 发起搜索
             search_url = f"https://x999x.me/search.php?mod=forum&srchtxt={urllib.parse.quote(code)}&searchsubmit=yes"
-            page.get(search_url)
+            tab.get(search_url)
             
             # 增加充分的等待时间，防止被 CF 拦截在请稍候
             for _ in range(20):
                 await asyncio.sleep(1)
-                title = page.title or ""
-                html = page.html or ""
-                # 如果盾没了，且页面加载了特定元素，就算成功
+                title = tab.title or ""
+                html = tab.html or ""
                 if "Just a moment" not in title and "Cloudflare" not in title and "cf-turnstile" not in html:
-                    if page.ele('.pb', timeout=0) or page.ele('.xs3', timeout=0) or "没有找到匹配结果" in html:
+                    if tab.ele('.pb', timeout=0) or tab.ele('.xs3', timeout=0) or "没有找到匹配结果" in html:
                         break
                         
             # 解析搜索结果
-            html = page.html or ""
-            logger.info(f"Sniper search page title: {page.title}")
+            html = tab.html or ""
+            logger.info(f"Sniper search page title: {tab.title}")
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(html, 'html.parser')
             
@@ -629,17 +631,18 @@ class TaskManager:
                 except: pass
             
             self.active_pages['retry'] = page
+            tab = page.new_tab()
             ws_log("✅ DrissionPage 浏览器内核启动成功。")
             
             # 必须先访问一次该域名的主页，才能把该域名的持久化 Cookie 注入到 page 实例中
-            ws_log("⏳ 正在执行绿卡预热校验，等待突破 5 秒盾...")
-            page.get("https://x999x.me/")
+            ws_log("⏳ 正在接驳底层物理下载引擎...")
+            tab.get("https://x999x.me/")
             # 等待出现论坛特征，证明破盾成功 (最多等 15 秒)
             passed = False
             for _ in range(15):
                 await asyncio.sleep(1)
-                html = page.html or ""
-                title = page.title or ""
+                html = tab.html or ""
+                title = tab.title or ""
                 if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
                     passed = True
                     break
@@ -708,14 +711,14 @@ class TaskManager:
                 
                 # --- 方案 B: 纯物理肉搏战 ---
                 ws_log(f"⚔️ 启动物理肉搏方案，强行驾驶浏览器驶入详情页: {target_url}")
-                page.get(target_url)
+                tab.get(target_url)
                 
                 # 等待 5 秒盾
                 passed_shield = False
                 for _ in range(20):
                     await asyncio.sleep(1)
-                    title = page.title or ""
-                    html = page.html or ""
+                    title = tab.title or ""
+                    html = tab.html or ""
                     if "Just a moment" not in title and "Cloudflare" not in title and "cf-turnstile" not in html:
                         passed_shield = True
                         break
@@ -723,7 +726,7 @@ class TaskManager:
                 if not passed_shield:
                     dl_res = "CF_BLOCKED_PHYSICAL"
                 else:
-                    html_text = page.html or ""
+                    html_text = tab.html or ""
                     import html as html_lib
                     import re
                     hrefs = re.findall(r'href=["\']([^"\']*mod=attachment[^"\']*)["\']', html_text)
@@ -742,18 +745,18 @@ class TaskManager:
                         from curl_cffi.requests import AsyncSession as CurlAsyncSession
                         
                         try:
-                            cookies_dict = page.cookies().as_dict()
+                            cookies_dict = tab.cookies().as_dict()
                         except TypeError:
-                            cookies_list = page.cookies(as_dict=False)
+                            cookies_list = tab.cookies(as_dict=False)
                             cookies_dict = {c['name']: c['value'] for c in cookies_list}
                             
                         headers = {
-                            "User-Agent": page.user_agent,
+                            "User-Agent": tab.user_agent,
                             "Referer": target_url
                         }
                         
                         dl_res = "NO_VALID_DOWNLOAD"
-                        ua = page.user_agent.lower()
+                        ua = tab.user_agent.lower()
                         impersonate_profile = "chrome120"
                         if "edg/" in ua or "edge" in ua:
                             impersonate_profile = "edge101"
@@ -822,10 +825,13 @@ class TaskManager:
             if 'retry' in self.active_pages:
                 del self.active_pages['retry']
             try:
-                page.quit()
+                if 'tab' in locals() and tab:
+                    tab.close()
+                if not self.active_spiders:
+                    page.quit()
             except:
                 pass
-            ws_log("✅ 死链抢救列车执行完毕。浏览器资源已释放。", explicit_level="success")
+            ws_log("✅ 执行完毕。独立任务标签页已安全释放。", explicit_level="success")
 
     async def run_sniper_task(self, records: list[dict]):
         """
@@ -875,17 +881,18 @@ class TaskManager:
                 except: pass
             
             self.active_pages['sniper'] = page
+            tab = page.new_tab()
             ws_log("✅ DrissionPage 浏览器内核启动成功。")
             
             # 必须先访问一次该域名的主页，才能把该域名的持久化 Cookie 注入到 page 实例中
-            ws_log("⏳ 正在执行绿卡预热校验，等待突破 5 秒盾...")
-            page.get("https://x999x.me/")
+            ws_log("⏳ 正在接驳底层物理下载引擎...")
+            tab.get("https://x999x.me/")
             # 等待出现论坛特征，证明破盾成功 (最多等 15 秒)
             passed = False
             for _ in range(15):
                 await asyncio.sleep(1)
-                html = page.html or ""
-                title = page.title or ""
+                html = tab.html or ""
+                title = tab.title or ""
                 if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
                     passed = True
                     break
@@ -954,14 +961,14 @@ class TaskManager:
                 
                 # --- 方案 B: 纯物理肉搏战 ---
                 ws_log(f"⚔️ 启动物理肉搏方案，强行驾驶浏览器驶入详情页: {target_url}")
-                page.get(target_url)
+                tab.get(target_url)
                 
                 # 等待 5 秒盾
                 passed_shield = False
                 for _ in range(20):
                     await asyncio.sleep(1)
-                    title = page.title or ""
-                    html = page.html or ""
+                    title = tab.title or ""
+                    html = tab.html or ""
                     if "Just a moment" not in title and "Cloudflare" not in title and "cf-turnstile" not in html:
                         passed_shield = True
                         break
@@ -969,7 +976,7 @@ class TaskManager:
                 if not passed_shield:
                     dl_res = "CF_BLOCKED_PHYSICAL"
                 else:
-                    html_text = page.html or ""
+                    html_text = tab.html or ""
                     import html as html_lib
                     import re
                     hrefs = re.findall(r'href=["\']([^"\']*mod=attachment[^"\']*)["\']', html_text)
@@ -988,18 +995,18 @@ class TaskManager:
                         from curl_cffi.requests import AsyncSession as CurlAsyncSession
                         
                         try:
-                            cookies_dict = page.cookies().as_dict()
+                            cookies_dict = tab.cookies().as_dict()
                         except TypeError:
-                            cookies_list = page.cookies(as_dict=False)
+                            cookies_list = tab.cookies(as_dict=False)
                             cookies_dict = {c['name']: c['value'] for c in cookies_list}
                             
                         headers = {
-                            "User-Agent": page.user_agent,
+                            "User-Agent": tab.user_agent,
                             "Referer": target_url
                         }
                         
                         dl_res = "NO_VALID_DOWNLOAD"
-                        ua = page.user_agent.lower()
+                        ua = tab.user_agent.lower()
                         impersonate_profile = "chrome120"
                         if "edg/" in ua or "edge" in ua:
                             impersonate_profile = "edge101"
@@ -1068,9 +1075,12 @@ class TaskManager:
             if 'sniper' in self.active_pages:
                 del self.active_pages['sniper']
             try:
-                page.quit()
+                if 'tab' in locals() and tab:
+                    tab.close()
+                if not self.active_spiders:
+                    page.quit()
             except:
                 pass
-            ws_log("✅ 精准狙击列车执行完毕。浏览器资源已释放。", explicit_level="success")
+            ws_log("✅ 执行完毕。独立任务标签页已安全释放。", explicit_level="success")
 
 task_manager = TaskManager()
