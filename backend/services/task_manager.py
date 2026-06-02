@@ -24,6 +24,27 @@ class TaskManager:
         self.worker_task = None
         self.stop_lab_requested = False
         self.current_running_task = None
+    def _get_chromium_options(self, config: dict, port: int = 9222):
+        from DrissionPage import ChromiumOptions
+        co = ChromiumOptions().set_local_port(port)
+        
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
+        if browser_path:
+            co.set_browser_path(browser_path)
+            
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        if config.get("hide_browser", False):
+            co.set_argument('--window-position=-32000,-32000')
+            
+        return co
+
 
     async def start_worker(self):
         if self.worker_task is None:
@@ -54,7 +75,6 @@ class TaskManager:
             self.current_running_task = section_key
             
             # Broadcast queue update right after popping
-            await self.broadcast_queue_status()
             
             try:
                 await self._execute_discuz_spider(section_key, mode)
@@ -62,9 +82,28 @@ class TaskManager:
                 logger.error(f"Worker execution error: {e}")
             finally:
                 self.current_running_task = None
+    def _get_chromium_options(self, config: dict, port: int = 9222):
+        from DrissionPage import ChromiumOptions
+        co = ChromiumOptions().set_local_port(port)
+        
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
+        if browser_path:
+            co.set_browser_path(browser_path)
+            
+        profile_path = os.path.abspath('data/browser_profile')
+        co.set_user_data_path(profile_path)
+        
+        if config.get("hide_browser", False):
+            co.set_argument('--window-position=-32000,-32000')
+            
+        return co
+
                 
-            # Broadcast queue update after completion
-            await self.broadcast_queue_status()
 
     async def broadcast_queue_status(self):
         status = await self.get_queue_status()
@@ -103,33 +142,16 @@ class TaskManager:
         from core.utils import load_config
         
         config = load_config()
-        # 强制与主爬虫共用 9222 端口，实现完全的绿卡与指纹共享
-        co = ChromiumOptions().set_local_port(9222)
-        browser_path = config.get("browser_path", "").strip()
-        if browser_path.lower() == "edge":
-            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-        elif browser_path.lower() == "chrome":
-            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-            
-        if browser_path:
-            co.set_browser_path(browser_path)
-        
-        profile_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'browser_profile')
-        co.set_user_data_path(profile_path)
-        
-        hide_browser = config.get("hide_browser", False)
-        if hide_browser:
-            co.set_argument('--window-position=-32000,-32000')
+        co = self._get_chromium_options(config)
         
         page = None
         tab = None
         results = []
         try:
             page = ChromiumPage(co)
-            if hide_browser:
+            if config.get("hide_browser"):
                 try: page.set.window.hide()
                 except: pass
-            # 开启新标签页，绝对不干扰正在运行的其他爬虫任务
             tab = page.new_tab()
             
             # 预热并等待过盾 (共用绿卡，通常秒过)
@@ -250,13 +272,13 @@ class TaskManager:
         """
         log_msg = f"Starting spider task for section: {section}"
         logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "info"})
+        await sniper_manager.broadcast_json({"type": "log", "message": log_msg, "level": "info"})
         
         await asyncio.sleep(5)
         
         log_msg = f"Finished spider task for section: {section}"
         logger.info(log_msg)
-        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
+        await sniper_manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
     async def run_discuz_spider(self, section_key: str, mode: str = "new", is_vip: bool = True):
         """
@@ -266,11 +288,11 @@ class TaskManager:
             # Check if already in queue
             for t in self._queue_list:
                 if t['section_key'] == section_key and t['mode'] == mode:
-                    await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 同模式任务已在队列中，请勿重复投递。", "level": "error"})
+                    await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 同模式任务已在队列中，请勿重复投递。", "level": "error"})
                     return
                     
         if section_key in self.active_spiders:
-             await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务正在运行中，请勿重复投递。", "level": "error"})
+             await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务正在运行中，请勿重复投递。", "level": "error"})
              return
              
         new_task = {
@@ -294,14 +316,14 @@ class TaskManager:
             mode_name = "极速追新" if mode == "new" else "深度考古"
             vip_mark = "⭐VIP " if is_vip else ""
             msg = f"📝 [{section_key}] ({mode_name}) {vip_mark}任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
-            await manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
+            await sniper_manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
 
     async def _execute_discuz_spider(self, section_key: str, mode: str):
         """
         运行真实的 Discuz 爬虫任务
         """
         if section_key in self.active_spiders:
-            await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
+            await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
             return
 
         def ws_log(msg: str, explicit_level: str = None):
@@ -318,7 +340,7 @@ class TaskManager:
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
                 
-                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except Exception as e:
                 logger.error(f"WebSocket broadcast error: {e}")
 
@@ -398,7 +420,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'cf_clearance' in self.active_pages:
@@ -476,7 +498,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'login_auth' in self.active_pages:
@@ -541,7 +563,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'sandbox' in self.active_pages:
@@ -608,7 +630,7 @@ class TaskManager:
                     if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'retry' in self.active_pages:
@@ -858,7 +880,7 @@ class TaskManager:
                     if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'sniper' in self.active_pages:
@@ -868,27 +890,11 @@ class TaskManager:
         ws_log(f"🚑 精准狙击特遣队出发！收到 {len(records)} 个抢救目标，准备执行定点爆破...")
         
         config = load_config()
-        hide_browser = config.get("hide_browser", False)
+        co = self._get_chromium_options(config)
         
-        co = ChromiumOptions().set_local_port(9222)
-        browser_path = config.get("browser_path", "").strip()
-        if browser_path.lower() == "edge":
-            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-        elif browser_path.lower() == "chrome":
-            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-            
-        if browser_path:
-            co.set_browser_path(browser_path)
-        profile_path = os.path.abspath('data/browser_profile')
-        co.set_user_data_path(profile_path)
-        
-        if hide_browser: 
-            ws_log("已开启无头静默模式运行。")
-            co.set_argument('--window-position=-32000,-32000')
-            
         try:
-            page = ChromiumPage(addr_or_opts=co)
-            if hide_browser:
+            page = ChromiumPage(co)
+            if config.get("hide_browser"):
                 try: page.set.window.hide()
                 except: pass
             
