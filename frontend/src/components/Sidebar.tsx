@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListTodo, Database, Settings, UserX, Heart, AlertTriangle, Rocket, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Database, Settings, UserX, Heart, AlertTriangle, Target, ShieldAlert } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface SidebarProps {
@@ -9,7 +9,7 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
   { id: 'tasks', label: '任务中心', icon: ListTodo },
-  { id: 'completion', label: '女优补全计划', icon: Rocket },
+  { id: 'sniper', label: '精准狙击', icon: Target },
   { id: 'failed_records', label: '死链回收站', icon: AlertTriangle },
   { id: 'database', label: '全局仓库', icon: Database },
   { id: 'title_blocklist', label: '标题屏蔽词库', icon: ShieldAlert },

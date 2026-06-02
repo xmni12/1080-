@@ -94,6 +94,101 @@ class TaskManager:
             await self.broadcast_queue_status()
         return removed
 
+    async def sniper_search(self, code: str) -> list[dict]:
+        """
+        为精准狙击中心实时爬取论坛搜索结果
+        """
+        import urllib.parse
+        from DrissionPage import ChromiumOptions, ChromiumPage
+        from core.utils import load_config
+        
+        config = load_config()
+        co = ChromiumOptions()
+        if config.get("browser_path"):
+            co.set_browser_path(config.get("browser_path"))
+        
+        profile_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'browser_profile')
+        co.set_user_data_path(profile_path)
+        co.headless(True) # 狙击搜索必须无头，不能打扰用户
+        
+        page = None
+        results = []
+        try:
+            page = ChromiumPage(co)
+            
+            # 预热并等待过盾
+            page.get("https://x999x.me/")
+            for _ in range(15):
+                await asyncio.sleep(0.5)
+                html = page.html or ""
+                title = page.title or ""
+                if "forum-" in html or "portal.php" in html or "forum.php" in html or "首页" in title:
+                    break
+                    
+            # 发起搜索
+            search_url = f"https://x999x.me/search.php?mod=forum&searchid=2&orderby=lastpost&ascdesc=desc&searchsubmit=yes&kw={urllib.parse.quote(code)}"
+            page.get(search_url)
+            
+            for _ in range(15):
+                await asyncio.sleep(0.5)
+                if page.ele('.pb', timeout=0) or page.ele('.xs3', timeout=0):
+                    break
+                    
+            # 解析搜索结果
+            html = page.html or ""
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # 尝试在列表中查找
+            items = soup.select('.pb')
+            if not items:
+                # 兼容不同版式的搜索结果
+                items = soup.select('li.pbw')
+                
+            for item in items:
+                try:
+                    title_a = item.select_one('h3.xs3 a') or item.select_one('.xs3 a')
+                    if not title_a: continue
+                    
+                    title_text = title_a.text.strip()
+                    href = title_a.get('href', '')
+                    if not href: continue
+                    
+                    forum_a = item.select_one('p.xg1 a') or item.select_one('.xg1 a')
+                    forum_name = forum_a.text.strip() if forum_a else "未知版块"
+                    
+                    date_span = item.select_one('p.xg1 span')
+                    post_date = date_span.text.strip() if date_span else ""
+                    
+                    # 粗略判断大小
+                    size_text = ""
+                    import re
+                    size_match = re.search(r'([0-9\.]+)\s*(GB|MB)', title_text, re.IGNORECASE)
+                    if size_match:
+                        size_text = f"{size_match.group(1)} {size_match.group(2).upper()}"
+                        
+                    results.append({
+                        "title": title_text,
+                        "href": href,
+                        "forum": forum_name,
+                        "date": post_date,
+                        "size": size_text
+                    })
+                except Exception as e:
+                    logger.error(f"Error parsing sniper search result: {e}")
+                    pass
+                    
+            return results
+            
+        except Exception as e:
+            logger.error(f"Sniper search failed: {e}")
+            return []
+        finally:
+            if page:
+                try:
+                    page.quit()
+                except: pass
+
     def stop_spider(self, section_key: str = None):
         """
         强制停止指定或所有版块的爬虫

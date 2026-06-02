@@ -7,7 +7,7 @@ import { Settings } from './pages/Settings';
 import { Blacklist } from './pages/Blacklist';
 import { Whitelist } from './pages/Whitelist';
 import { FailedRecords } from './pages/FailedRecords';
-import { Completion } from './pages/Completion';
+import { Sniper } from './pages/Sniper';
 import { TitleBlocklist } from './pages/TitleBlocklist';
 
 function App() {
@@ -17,7 +17,7 @@ function App() {
     <Layout currentTab={currentTab} setCurrentTab={setCurrentTab}>
       {currentTab === 'dashboard' && <Dashboard />}
       {currentTab === 'tasks' && <Tasks />}
-      {currentTab === 'completion' && <Completion />}
+      {currentTab === 'sniper' && <Sniper />}
       {currentTab === 'failed_records' && <FailedRecords />}
       {currentTab === 'database' && <Database />}
       {currentTab === 'title_blocklist' && <TitleBlocklist />}

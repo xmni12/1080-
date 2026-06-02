@@ -9,44 +9,37 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
-@router.post("/completion/sync")
-async def sync_completion(request: SyncCompletionRequest):
+@router.get("/sniper/search")
+async def execute_sniper_search(code: str):
     """
-    执行 AVBase 与 Emby 媒体库的双向对账
+    调用底层的 task_manager 执行精准狙击搜索
     """
-    # 1. Get works from AVBase
-    avbase_data = await avbase_client.get_works_by_talent_url(request.url)
-    actor_name = avbase_data.get("actor_name", "未知演员")
-    avbase_works = avbase_data.get("works", [])
-    
-    # 2. Get owned codes from Emby
-    owned_codes = await emby_client.get_all_movie_codes()
-    
-    # 3. Compute missing
-    missing_items = []
-    for work in avbase_works:
-        if work["code"] not in owned_codes:
-            missing_items.append(work)
-            
-    # Sort missing items (simplistic sorting)
-    missing_items.sort(key=lambda x: x["code"])
-            
-    return {
-        "status": "success",
-        "actor": actor_name,
-        "total_works": len(avbase_works),
-        "emby_owned": len(avbase_works) - len(missing_items),
-        "missing": len(missing_items),
-        "missing_items": missing_items
-    }
+    try:
+        results = await task_manager.sniper_search(code)
+        return {"status": "success", "results": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-@router.post("/completion/search")
-async def search_completion(request: SearchCompletionRequest, background_tasks: BackgroundTasks):
+@router.post("/sniper/download")
+async def trigger_sniper_download(request: dict, background_tasks: BackgroundTasks):
     """
-    触发后台针对缺失番号的强行搜索下载任务
+    触发精准狙击下载
+    将选定的目标包装为一条死链抢救记录，然后抛给死链特遣队执行 100% 物理突破下载
     """
-    background_tasks.add_task(task_manager.run_completion_search, request.codes)
-    return {"status": "started"}
+    post_url = request.get("href")
+    code = request.get("code")
+    title = request.get("title", "")
+    section = request.get("section", "4k")
+    
+    record = {
+        "code": code,
+        "post_url": post_url,
+        "title": title,
+        "section": section
+    }
+    
+    background_tasks.add_task(task_manager.run_retry_tasks, [record])
+    return {"status": "started", "message": "狙击下载任务已派发至死链特遣队！"}
 
 @router.get("/queue")
 async def get_queue():

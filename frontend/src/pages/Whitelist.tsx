@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, PlusCircle, Trash2, Heart, ChevronLeft, ChevronRight, ShieldCheck, Loader2, Download, Zap } from 'lucide-react';
+import { Search, PlusCircle, Trash2, Heart, ChevronLeft, ChevronRight, ShieldCheck, Loader2, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 import axios from 'axios';
 
