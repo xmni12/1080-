@@ -109,7 +109,8 @@ class TaskManager:
         
         profile_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'browser_profile')
         co.set_user_data_path(profile_path)
-        co.headless(True) # 狙击搜索必须无头，不能打扰用户
+        # 不使用 headless(True) 否则必定触发 CF 死循环盾
+        co.set_argument('--window-position=-32000,-32000')
         
         page = None
         results = []
@@ -126,16 +127,22 @@ class TaskManager:
                     break
                     
             # 发起搜索
-            search_url = f"https://x999x.me/search.php?mod=forum&searchid=2&orderby=lastpost&ascdesc=desc&searchsubmit=yes&kw={urllib.parse.quote(code)}"
+            search_url = f"https://x999x.me/search.php?mod=forum&srchtxt={urllib.parse.quote(code)}&searchsubmit=yes"
             page.get(search_url)
             
-            for _ in range(15):
-                await asyncio.sleep(0.5)
-                if page.ele('.pb', timeout=0) or page.ele('.xs3', timeout=0):
-                    break
-                    
+            # 增加充分的等待时间，防止被 CF 拦截在请稍候
+            for _ in range(20):
+                await asyncio.sleep(1)
+                title = page.title or ""
+                html = page.html or ""
+                # 如果盾没了，且页面加载了特定元素，就算成功
+                if "Just a moment" not in title and "Cloudflare" not in title and "cf-turnstile" not in html:
+                    if page.ele('.pb', timeout=0) or page.ele('.xs3', timeout=0) or "没有找到匹配结果" in html:
+                        break
+                        
             # 解析搜索结果
             html = page.html or ""
+            logger.info(f"Sniper search page title: {page.title}")
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(html, 'html.parser')
             
