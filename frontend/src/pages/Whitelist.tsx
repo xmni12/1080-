@@ -237,20 +237,19 @@ export function Whitelist() {
                   </th>
                   <th className="px-5 py-3 font-medium">目标演员</th>
                   <th className="px-5 py-3 font-medium w-1/4">录入时间</th>
-                  <th className="px-5 py-3 font-medium w-24 text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-5 py-12 text-center text-slate-400">
+                    <td colSpan={3} className="px-5 py-12 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 opacity-50 text-emerald-500" />
                       正在加载数据...
                     </td>
                   </tr>
                 ) : actors.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-5 py-12 text-center text-slate-400 italic">
+                    <td colSpan={3} className="px-5 py-12 text-center text-slate-400 italic">
                       {search ? "没有找到符合条件的记录" : "白名单目前为空，快去添加吧"}
                     </td>
                   </tr>
@@ -294,29 +293,6 @@ export function Whitelist() {
                       </td>
                       <td className="px-5 py-3 text-slate-400 text-xs">
                         {new Date(actor.added_time).toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          onClick={async (e) => {
-                              e.stopPropagation();
-                              if (confirm(`【全集制霸确认】\n\n即将对 [${actor.name}] 启动终极刮削计划：\n1. 引擎将深入 AVBase 抓取其生涯 100% 番号全集。\n2. 自动与本地数据库对账，剔除已下载作品。\n3. 生成【缺失大名单】并投入自动搜索下载列车。\n\n⚠️ 注：搜索补全目标将严格限制在 4K 超清与 HD 高清有码版块，过滤所有 VR 资源。\n\n该操作独立于日常巡逻任务，是否立即启动？`)) {
-                                  try {
-                                      const res = await axios.post(`http://127.0.0.1:8000/api/whitelist/completion/${encodeURIComponent(actor.name)}`);
-                                      if (res.data.status === 'success') {
-                                          alert(`🚀 制霸指令已下达！\n\n分析报告：\n生涯总番号：${res.data.total} 部\n本地已拥有：${res.data.owned} 部\n确认缺失量：${res.data.missing} 部\n\n请前往【任务调度中心】的日志大盘查看特遣队的实时狙击战况！`);
-                                      } else {
-                                          alert(`启动失败：${res.data.message}`);
-                                      }
-                                  } catch (error: any) {
-                                      alert(`网络异常：${error.message}`);
-                                  }
-                              }
-                          }}
-                          className="p-2 bg-slate-50 hover:bg-amber-100 text-slate-400 hover:text-amber-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-transparent hover:border-amber-200"
-                          title="一键全集补全制霸"
-                        >
-                          <Zap className="w-4 h-4" />
-                        </button>
                       </td>
                     </tr>
                   ))
