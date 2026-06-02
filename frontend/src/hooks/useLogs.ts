@@ -18,7 +18,11 @@ export function useLogs(url: string, onQueueUpdate?: (data: any) => void) {
     let isCancelled = false;
     
     // 1. Fetch history first
-    axios.get('http://127.0.0.1:8000/api/ws/history').then(res => {
+    const historyUrl = url.includes('sniper_logs') 
+      ? 'http://127.0.0.1:8000/api/ws/sniper_history' 
+      : 'http://127.0.0.1:8000/api/ws/history';
+      
+    axios.get(historyUrl).then(res => {
         if (isCancelled) return;
         
         if (res.data && Array.isArray(res.data)) {

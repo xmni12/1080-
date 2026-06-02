@@ -125,7 +125,7 @@ export function Sniper() {
 
       {/* 搜索结果展示区 */}
       {hasSearched && (
-        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex-[2] bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[300px]">
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
                <ListFilter className="w-5 h-5 text-slate-400" />
@@ -206,7 +206,7 @@ export function Sniper() {
       )}
       
       {/* 实时物理狙击大盘 */}
-      <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+      <div className="h-64 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
         <LogConsole logs={logs} onClear={clearLogs} isConnected={isConnected} />
       </div>
     </div>
