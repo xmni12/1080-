@@ -105,18 +105,30 @@ class TaskManager:
         config = load_config()
         # 强制与主爬虫共用 9222 端口，实现完全的绿卡与指纹共享
         co = ChromiumOptions().set_local_port(9222)
-        if config.get("browser_path"):
-            co.set_browser_path(config.get("browser_path"))
+        browser_path = config.get("browser_path", "").strip()
+        if browser_path.lower() == "edge":
+            browser_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        elif browser_path.lower() == "chrome":
+            browser_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+            
+        if browser_path:
+            co.set_browser_path(browser_path)
         
         profile_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'browser_profile')
         co.set_user_data_path(profile_path)
-        co.set_argument('--window-position=-32000,-32000')
+        
+        hide_browser = config.get("hide_browser", False)
+        if hide_browser:
+            co.set_argument('--window-position=-32000,-32000')
         
         page = None
         tab = None
         results = []
         try:
             page = ChromiumPage(co)
+            if hide_browser:
+                try: page.set.window.hide()
+                except: pass
             # 开启新标签页，绝对不干扰正在运行的其他爬虫任务
             tab = page.new_tab()
             
