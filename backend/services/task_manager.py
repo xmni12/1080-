@@ -161,11 +161,29 @@ class TaskManager:
                     href = title_a.get('href', '')
                     if not href: continue
                     
-                    forum_a = item.select_one('p.xg1 a') or item.select_one('.xg1 a')
+                    forum_a = item.select_one('a.xi1')
                     forum_name = forum_a.text.strip() if forum_a else "未知版块"
                     
-                    date_span = item.select_one('p.xg1 span')
-                    post_date = date_span.text.strip() if date_span else ""
+                    spans = item.select('p > span')
+                    post_date = spans[0].text.strip() if spans else ""
+                    
+                    # --- 核心降噪漏斗：严格剔除不需要的版块 ---
+                    forum_text = forum_name.upper()
+                    title_text_upper = title_text.upper()
+                    
+                    # 绝对屏蔽 VR 和 字幕版
+                    if "VR" in forum_text or "VR" in title_text_upper: continue
+                    if "字幕" in forum_text or "字" in forum_text: continue
+                    
+                    # 仅保留 4K 或 HD (高清有碼)
+                    is_valid_section = False
+                    if "4K" in forum_text or "4K" in title_text_upper:
+                        is_valid_section = True
+                    elif "高清" in forum_text or "有碼" in forum_text or "HD" in title_text_upper:
+                        is_valid_section = True
+                        
+                    if not is_valid_section:
+                        continue
                     
                     # 粗略判断大小
                     size_text = ""

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Target, Search, Loader2, Download, ExternalLink, Clock, HardDrive, ListFilter } from 'lucide-react';
 import { clsx } from 'clsx';
 import axios from 'axios';
+import { LogConsole } from '../components/LogConsole';
+import { useLogs } from '../hooks/useLogs';
 
 interface SniperResult {
   title: string;
@@ -17,6 +19,8 @@ export function Sniper() {
   const [results, setResults] = useState<SniperResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+  
+  const { logs, isConnected, clearLogs } = useLogs('ws://127.0.0.1:8000/ws/logs');
 
   const handleSearch = async (searchCode: string = code) => {
     if (!searchCode.trim()) return;
@@ -200,6 +204,11 @@ export function Sniper() {
           </div>
         </div>
       )}
+      
+      {/* 实时物理狙击大盘 */}
+      <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+        <LogConsole logs={logs} onClear={clearLogs} isConnected={isConnected} />
+      </div>
     </div>
   );
 }
