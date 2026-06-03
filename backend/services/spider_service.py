@@ -169,25 +169,38 @@ class DiscuzSpiderService:
                         
                         async with db_lock:
                             is_global_exists = await self.check_code_exists_globally(session, code)
-                            
+
                             if section_key == '4k':
                                 if await self.check_code_exists_in_section(session, '4k', code):
                                     skip_download = True
                                 elif await self.check_code_exists_in_section(session, 'hd', code):
                                     self._log(f"🔄 [检测升级] {code} 在 HD 库已存在，正在准备升级为 4K...", level="info")
                                     is_upgrade = True
+                                elif await self.check_code_exists_in_section(session, 'sub', code):
+                                    self._log(f"🔄 [画质升级] {code} 仅在字幕版块存在，正在为其补充 4K 纯净原档...", level="info")
+                                    is_upgrade = True
                                 elif is_global_exists:
+                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，4K 版块跳过。", level="warn")
                                     skip_download = True
                             elif section_key == 'hd':
                                 if await self.check_code_exists_in_section(session, '4k', code):
                                     self._log(f"🚧 [避让] {code} 在 4K 库已存在，HD 版块跳过。", level="warn")
                                     skip_download = True
+                                elif await self.check_code_exists_in_section(session, 'hd', code):
+                                    skip_download = True
+                                elif await self.check_code_exists_in_section(session, 'sub', code):
+                                    self._log(f"🔄 [画质补全] {code} 仅在字幕版块存在，正在为其补充 HD 纯净原档...", level="info")
+                                    is_upgrade = True
                                 elif is_global_exists:
+                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，HD 版块跳过。", level="warn")
                                     skip_download = True
                             else:
-                                if is_global_exists:
+                                if await self.check_code_exists_in_section(session, section_key, code):
                                     skip_download = True
-                        
+                                elif is_global_exists:
+                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，{section_key} 版块跳过。", level="warn")
+                                    skip_download = True
+
                         if skip_download:
                             return
                         
