@@ -272,13 +272,13 @@ class TaskManager:
         """
         log_msg = f"Starting spider task for section: {section}"
         logger.info(log_msg)
-        await sniper_manager.broadcast_json({"type": "log", "message": log_msg, "level": "info"})
+        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "info"})
         
         await asyncio.sleep(5)
         
         log_msg = f"Finished spider task for section: {section}"
         logger.info(log_msg)
-        await sniper_manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
+        await manager.broadcast_json({"type": "log", "message": log_msg, "level": "success"})
 
     async def run_discuz_spider(self, section_key: str, mode: str = "new", is_vip: bool = True):
         """
@@ -288,11 +288,11 @@ class TaskManager:
             # Check if already in queue
             for t in self._queue_list:
                 if t['section_key'] == section_key and t['mode'] == mode:
-                    await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 同模式任务已在队列中，请勿重复投递。", "level": "error"})
+                    await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 同模式任务已在队列中，请勿重复投递。", "level": "error"})
                     return
                     
         if section_key in self.active_spiders:
-             await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务正在运行中，请勿重复投递。", "level": "error"})
+             await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 任务正在运行中，请勿重复投递。", "level": "error"})
              return
              
         new_task = {
@@ -316,14 +316,14 @@ class TaskManager:
             mode_name = "极速追新" if mode == "new" else "深度考古"
             vip_mark = "⭐VIP " if is_vip else ""
             msg = f"📝 [{section_key}] ({mode_name}) {vip_mark}任务已加入等待队列 (当前排在第 {queue_pos} 位)..."
-            await sniper_manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
+            await manager.broadcast_json({"type": "log", "message": msg, "level": "info"})
 
     async def _execute_discuz_spider(self, section_key: str, mode: str):
         """
         运行真实的 Discuz 爬虫任务
         """
         if section_key in self.active_spiders:
-            await sniper_manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
+            await manager.broadcast_json({"type": "log", "message": f"❌ [{section_key}] 爬虫任务已在运行中，请勿重复启动。", "level": "error"})
             return
 
         def ws_log(msg: str, explicit_level: str = None):
@@ -340,7 +340,7 @@ class TaskManager:
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
                 
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except Exception as e:
                 logger.error(f"WebSocket broadcast error: {e}")
 
@@ -420,7 +420,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'cf_clearance' in self.active_pages:
@@ -498,7 +498,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'login_auth' in self.active_pages:
@@ -563,7 +563,7 @@ class TaskManager:
                 level = "info"
                 if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                 elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'sandbox' in self.active_pages:
@@ -630,7 +630,7 @@ class TaskManager:
                     if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'retry' in self.active_pages:
