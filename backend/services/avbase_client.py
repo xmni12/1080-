@@ -11,21 +11,22 @@ class AvbaseClient:
     def __init__(self):
         self.base_url = "https://avbase.net"
 
-    async def get_work_info_by_code(self, code: str) -> dict:
+    async def get_work_info_by_code(self, code: str) -> dict | None:
         """
         通过番号查询对应的演员列表和完整标题元数据
+        返回 None 表示网络请求失败或超时
         """
         try:
             # 随机延迟，防止触发反爬
             await asyncio.sleep(random.uniform(1.0, 2.5))
 
-            async with CurlAsyncSession(impersonate='chrome120', timeout=15.0) as client:
+            async with CurlAsyncSession(impersonate='chrome120', timeout=25.0) as client:
                 search_url = f"{self.base_url}/works?q={code}"
                 resp = await client.get(search_url)
 
                 if resp.status_code != 200:
                     logger.warning(f"AVBase search failed for {code}: HTTP {resp.status_code}")
-                    return {"actors": [], "title": ""}
+                    return None
 
                 html_text = resp.text
 
@@ -67,7 +68,7 @@ class AvbaseClient:
 
         except Exception as e:
             logger.error(f"AVBase search exception for {code}: {e}")
-            return {"actors": [], "title": ""}
+            return None
 
     async def get_works_by_talent_url(self, talent_url: str):
         """

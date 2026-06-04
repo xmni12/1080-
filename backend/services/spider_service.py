@@ -168,37 +168,21 @@ class DiscuzSpiderService:
                         is_upgrade = False
                         
                         async with db_lock:
-                            is_global_exists = await self.check_code_exists_globally(session, code)
-
                             if section_key == '4k':
                                 if await self.check_code_exists_in_section(session, '4k', code):
                                     skip_download = True
                                 elif await self.check_code_exists_in_section(session, 'hd', code):
-                                    self._log(f"🔄 [检测升级] {code} 在 HD 库已存在，正在准备升级为 4K...", level="info")
+                                    self._log(f"🔄 [画质升级] {code} 在 HD 库已存在，正在准备升级为 4K 原档...", level="info")
                                     is_upgrade = True
-                                elif await self.check_code_exists_in_section(session, 'sub', code):
-                                    self._log(f"🔄 [画质升级] {code} 仅在字幕版块存在，正在为其补充 4K 纯净原档...", level="info")
-                                    is_upgrade = True
-                                elif is_global_exists:
-                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，4K 版块跳过。", level="warn")
-                                    skip_download = True
                             elif section_key == 'hd':
                                 if await self.check_code_exists_in_section(session, '4k', code):
-                                    self._log(f"🚧 [避让] {code} 在 4K 库已存在，HD 版块跳过。", level="warn")
+                                    self._log(f"🚧 [画质避让] {code} 在 4K 库已存在，无需重复下载 HD 版块，跳过。", level="warn")
                                     skip_download = True
                                 elif await self.check_code_exists_in_section(session, 'hd', code):
                                     skip_download = True
-                                elif await self.check_code_exists_in_section(session, 'sub', code):
-                                    self._log(f"🔄 [画质补全] {code} 仅在字幕版块存在，正在为其补充 HD 纯净原档...", level="info")
-                                    is_upgrade = True
-                                elif is_global_exists:
-                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，HD 版块跳过。", level="warn")
-                                    skip_download = True
                             else:
+                                # 对于 VR 和 SUB (字幕) 等平行版块，仅执行本版块内的绝对孤岛去重
                                 if await self.check_code_exists_in_section(session, section_key, code):
-                                    skip_download = True
-                                elif is_global_exists:
-                                    self._log(f"🚧 [全局避让] {code} 在其他版块已存在，{section_key} 版块跳过。", level="warn")
                                     skip_download = True
 
                         if skip_download:
@@ -218,6 +202,31 @@ class DiscuzSpiderService:
                         
                         # --- AVBase 智能多维演员滤网 (A+B方案) ---
                         work_info = await avbase_client.get_work_info_by_code(code)
+                        
+                        # 检测到 AVBase 网络异常或超时
+                        if work_info is None:
+                            self._log(f"⚠️ [{code}] AVBase 服务器响应超时或异常，为防止错杀，暂时跳过该资源。", level="warn")
+                            # 将失败的记录持久化到重试池，等待后续抢救
+                            async with db_lock:
+                                fail_stmt = select(FailedRecord).where(FailedRecord.code == code.upper())
+                                fail_record = (await session.execute(fail_stmt)).scalar_one_or_none()
+                                err_msg = "AVBase 演员信息抓取超时，为防错杀暂时跳过"
+                                if not fail_record:
+                                    new_failed = FailedRecord(
+                                        section=section_key,
+                                        code=code.upper(),
+                                        title=title,
+                                        post_url=post_url,
+                                        reason=err_msg,
+                                        failed_time=datetime.now()
+                                    )
+                                    session.add(new_failed)
+                                else:
+                                    fail_record.reason = err_msg
+                                    fail_record.failed_time = datetime.now()
+                                await session.commit()
+                            return
+                            
                         avbase_title = work_info.get("title", "")
                         actors_info = work_info.get("actors", [])
                         
