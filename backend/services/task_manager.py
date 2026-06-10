@@ -807,11 +807,31 @@ class TaskManager:
                                             
                                         content_head = dl_resp.content[:50]
                                         ext = ""
-                                        if content_head.startswith(b'Rar!\x1a\x07'): ext = ".rar"
-                                        elif content_head.startswith(b'PK\x03\x04'): ext = ".zip"
-                                        elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'): ext = ".7z"
-                                        elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head: ext = ".torrent"
-                                        else:
+                                        cd = dl_resp.headers.get("Content-Disposition", "")
+                                        server_ext = ""
+                                        if "filename=" in cd:
+                                            import urllib.parse
+                                            filename_raw = cd.split("filename=")[-1].strip('"\'')
+                                            server_ext = os.path.splitext(urllib.parse.unquote(filename_raw))[1].lower()
+
+                                        is_valid = False
+                                        if content_head.startswith(b'Rar!\x1a\x07'): 
+                                            ext = ".rar"
+                                            is_valid = True
+                                        elif content_head.startswith(b'PK\x03\x04'): 
+                                            ext = ".zip"
+                                            is_valid = True
+                                        elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'): 
+                                            ext = ".7z"
+                                            is_valid = True
+                                        elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head: 
+                                            ext = ".torrent"
+                                            is_valid = True
+                                        elif server_ext in ['.srt', '.ass', '.vtt', '.txt'] and not content_head.strip().startswith(b'<'):
+                                            ext = server_ext
+                                            is_valid = True
+                                            
+                                        if not is_valid:
                                             dl_res = "INVALID_FILE_CONTENT"
                                             continue
                                             
@@ -880,7 +900,7 @@ class TaskManager:
                     if "错误" in msg or "异常" in msg or "失败" in msg: level = "error"
                     elif "避让" in msg or "跳过" in msg or "拦截" in msg: level = "warn"
                     elif "结束" in msg or "完成" in msg or "成功" in msg: level = "success"
-                loop.create_task(sniper_sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
+                loop.create_task(sniper_manager.broadcast_json({"type": "log", "message": msg, "level": level}))
             except: pass
 
         if 'sniper' in self.active_pages:
@@ -1041,11 +1061,31 @@ class TaskManager:
                                             
                                         content_head = dl_resp.content[:50]
                                         ext = ""
-                                        if content_head.startswith(b'Rar!\x1a\x07'): ext = ".rar"
-                                        elif content_head.startswith(b'PK\x03\x04'): ext = ".zip"
-                                        elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'): ext = ".7z"
-                                        elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head: ext = ".torrent"
-                                        else:
+                                        cd = dl_resp.headers.get("Content-Disposition", "")
+                                        server_ext = ""
+                                        if "filename=" in cd:
+                                            import urllib.parse
+                                            filename_raw = cd.split("filename=")[-1].strip('"\'')
+                                            server_ext = os.path.splitext(urllib.parse.unquote(filename_raw))[1].lower()
+
+                                        is_valid = False
+                                        if content_head.startswith(b'Rar!\x1a\x07'): 
+                                            ext = ".rar"
+                                            is_valid = True
+                                        elif content_head.startswith(b'PK\x03\x04'): 
+                                            ext = ".zip"
+                                            is_valid = True
+                                        elif content_head.startswith(b'7z\xbc\xaf\x27\x1c'): 
+                                            ext = ".7z"
+                                            is_valid = True
+                                        elif content_head.startswith(b'd8:announce') or content_head.startswith(b'd4:info') or b':announce' in content_head: 
+                                            ext = ".torrent"
+                                            is_valid = True
+                                        elif server_ext in ['.srt', '.ass', '.vtt', '.txt'] and not content_head.strip().startswith(b'<'):
+                                            ext = server_ext
+                                            is_valid = True
+                                            
+                                        if not is_valid:
                                             dl_res = "INVALID_FILE_CONTENT"
                                             continue
                                             
