@@ -26,6 +26,8 @@ export function Database() {
   // 筛选与分页状态
   const [filterSection, setFilterSection] = useState('all');
   const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   
@@ -34,13 +36,14 @@ export function Database() {
   const [manualSection, setManualSection] = useState('4k');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isNuclearDeleting, setIsNuclearDeleting] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // 当筛选条件或页大小改变时，重置页码到1
   useEffect(() => {
     setPage(1);
-  }, [filterSection, search, pageSize]);
+  }, [filterSection, search, startDate, endDate, pageSize]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -48,7 +51,7 @@ export function Database() {
     }, 300); // 搜索防抖
 
     return () => clearTimeout(delayDebounceFn);
-  }, [filterSection, search, page, pageSize]);
+  }, [filterSection, search, startDate, endDate, page, pageSize]);
 
   const fetchData = async () => {
     try {
@@ -258,14 +261,32 @@ export function Database() {
                 </select>
               </div>
               
-              <div className="relative w-56">
+              <div className="relative w-48">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="搜索番号或帖子标题..."
+                  placeholder="搜索番号或标题..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="px-2 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-primary text-slate-600"
+                  title="起始入库日期"
+                />
+                <span className="text-slate-400">-</span>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="px-2 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-primary text-slate-600"
+                  title="结束入库日期"
                 />
               </div>
             </div>
@@ -284,10 +305,41 @@ export function Database() {
               <button 
                 onClick={handleBulkDelete}
                 disabled={selectedIds.size === 0 || isDeleting}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-rose-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-200 text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors border border-slate-200"
+                title="删除当前勾选的条目"
               >
                 {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                删除 ({selectedIds.size})
+                删勾选 ({selectedIds.size})
+              </button>
+
+              <button 
+                onClick={async () => {
+                  if (totalRecords === 0) return;
+                  if (!confirm(`💣【核弹级清理确认】💣\n\n系统即将根据您当前的筛选条件，一次性彻底销毁 ${totalRecords} 条记录！\n(无论跨越多少分页，凡是匹配上述 [版块]、[搜索词]、[日期范围] 的数据将灰飞烟灭)\n\n此操作不可逆！您确定要执行吗？`)) return;
+                  
+                  setIsNuclearDeleting(true);
+                  try {
+                    const res = await axios.post('http://127.0.0.1:8000/api/records/delete_by_filter', {
+                      section: filterSection,
+                      search: search,
+                      start_date: startDate,
+                      end_date: endDate
+                    });
+                    alert(`☢️ 核爆清理完毕！已成功销毁 ${res.data.deleted} 条底层记录！`);
+                    fetchData();
+                  } catch (error) {
+                    console.error('Nuclear delete failed', error);
+                    alert('清理失败，请检查后端状态。');
+                  } finally {
+                    setIsNuclearDeleting(false);
+                  }
+                }}
+                disabled={totalRecords === 0 || isNuclearDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-bold transition-all shadow-[0_0_10px_rgba(244,63,94,0.3)] border border-rose-600"
+                title="一键销毁当前条件下的所有结果 (无视分页)"
+              >
+                {isNuclearDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                一键抹除所有 ({totalRecords})
               </button>
             </div>
           </div>

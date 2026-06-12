@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 
 from backend.database import get_db
 from backend.models import DownloadRecord
-from backend.schemas import RecordResponse, PaginatedRecordResponse, ManualEntryRequest, DeleteRequest
+from backend.schemas import RecordResponse, PaginatedRecordResponse, ManualEntryRequest, DeleteRequest, DeleteByFilterRequest
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -131,6 +131,39 @@ async def delete_records(request: DeleteRequest, db: AsyncSession = Depends(get_
     if not request.ids:
         return {"status": "success", "deleted": 0}
     stmt = delete(DownloadRecord).where(DownloadRecord.id.in_(request.ids))
+    result = await db.execute(stmt)
+    await db.commit()
+    return {"status": "success", "deleted": result.rowcount}
+
+@router.post("/delete_by_filter")
+async def delete_by_filter(request: DeleteByFilterRequest, db: AsyncSession = Depends(get_db)):
+    """
+    根据复合过滤条件进行核弹级批量截断删除
+    """
+    stmt = delete(DownloadRecord)
+    
+    if request.section and request.section != 'all':
+        stmt = stmt.where(DownloadRecord.section == request.section)
+        
+    if request.search:
+        search_term = f"%{request.search}%"
+        stmt = stmt.where((DownloadRecord.code.ilike(search_term)) | (DownloadRecord.title.ilike(search_term)))
+        
+    if request.start_date:
+        try:
+            start_date = datetime.strptime(request.start_date, "%Y-%m-%d")
+            stmt = stmt.where(DownloadRecord.download_time >= start_date)
+        except ValueError:
+            pass
+            
+    if request.end_date:
+        try:
+            # Include the whole end day
+            end_date = datetime.strptime(request.end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            stmt = stmt.where(DownloadRecord.download_time <= end_date)
+        except ValueError:
+            pass
+            
     result = await db.execute(stmt)
     await db.commit()
     return {"status": "success", "deleted": result.rowcount}

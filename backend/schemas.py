@@ -59,6 +59,12 @@ class EmbySettings(BaseModel):
     server_url: str = ""
     api_key: str = ""
 
+class DeleteByFilterRequest(BaseModel):
+    section: Optional[str] = None
+    search: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
 class GlobalSettings(BaseModel):
     sections: dict[str, SectionSettings]
     hide_browser: bool = False
